@@ -11,7 +11,7 @@ def create_base_model():
 
     x = seq_input
 
-    x = Embedding(MAX_NB_WORDS, NUM_UNITS)(x)
+    x = Embedding(NUM_VOCAB, NUM_UNITS)(x)
     x = LSTM(NUM_UNITS)(x)
 
     return Model(seq_input, x)
@@ -25,6 +25,10 @@ def create_generator(base_model):
     x = base_model(seq_input)
 
     model = Model(seq_input, x)
-    model.compile(optimizer='nadam', loss='categorical_crossentropy')
+    model.compile(
+        optimizer='nadam',
+        loss='categorical_crossentropy',
+        metrics=['acc']
+    )
 
     return model
