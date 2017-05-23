@@ -4,6 +4,7 @@ from keras.utils import to_categorical
 from keras.callbacks import ModelCheckpoint
 import numpy as np
 import os
+import json
 
 from models import *
 from constants import *
@@ -68,6 +69,9 @@ def load_embedding(tokenizer):
     return embedding_matrix
 
 def main():
+    """
+    Main function executed to start training on dataset.
+    """
     # Create tokenizer
     tokenizer = Tokenizer(num_words=MAX_VOCAB)
     # Load data
@@ -80,6 +84,10 @@ def main():
     generator = create_generator(base_model)
 
     os.makedirs('out', exist_ok=True)
+
+    # Write word index to file for generation
+    with open('out/word_index.json', 'w') as f:
+        json.dump(tokenizer.word_index, f)
 
     # MLE Training
     generator.fit(
