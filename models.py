@@ -1,5 +1,5 @@
 from keras.models import Model
-from keras.layers import Input, Dense, LSTM, Embedding, Activation
+from keras.layers import Input, Dense, LSTM, Dropout, Embedding, Activation
 
 from constants import *
 
@@ -9,10 +9,12 @@ def create_base_model():
     """
     seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
 
-    x = seq_input
+    # Conver to embedding space
+    x = Embedding(NUM_VOCAB, NUM_UNITS)(seq_input)
 
-    x = Embedding(NUM_VOCAB, NUM_UNITS)(x)
-    x = LSTM(NUM_UNITS)(x)
+    # Simple LSTM with dropout
+    x = LSTM(NUM_UNITS, return_sequences=True)(x)
+    x = Dropout(0.5)(x)
 
     return Model(seq_input, x)
 
@@ -23,6 +25,10 @@ def create_generator(base_model):
     seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
 
     x = base_model(seq_input)
+
+    # Prediction
+    x = Dense(NUM_VOCAB)(x)
+    x = Activation('softmax')(x)
 
     model = Model(seq_input, x)
     model.compile(
