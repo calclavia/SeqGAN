@@ -31,9 +31,10 @@ def load_data(tokenizer):
 
     # Create training data and target data.
     # Truncates and pads sequences so that they're the same length.
-    train_data = pad_sequences(sequences[:][:-1], maxlen=SEQ_LEN)
+    train_data = pad_sequences([x[:-1] for x in sequences], maxlen=SEQ_LEN)
     # Target data is training data shfited by one word
-    target_data = pad_sequences(sequences[:][1:], maxlen=SEQ_LEN)
+    target_data = pad_sequences([x[1:] for x in sequences], maxlen=SEQ_LEN)
+
     # Convert to one-hot vector
     target_data = np.array([to_categorical(seq, MAX_VOCAB) for seq in target_data])
 
