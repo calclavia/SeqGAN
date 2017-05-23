@@ -19,9 +19,9 @@ def create_base_model(embedding_matrix):
 
     # LSTM with dropout
     x = LSTM(NUM_UNITS, return_sequences=True)(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.2)(x)
     x = LSTM(NUM_UNITS, return_sequences=True)(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.2)(x)
 
     return Model(seq_input, x)
 
@@ -39,7 +39,7 @@ def create_generator(base_model):
 
     model = Model(seq_input, x)
     model.compile(
-        optimizer='nadam',
+        optimizer='rmsprop',
         loss='categorical_crossentropy',
         metrics=['acc']
     )
