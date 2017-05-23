@@ -1,7 +1,9 @@
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
+from keras.callbacks import ModelCheckpoint
 import numpy as np
+import os
 
 from models import *
 from constants import *
@@ -77,12 +79,16 @@ def main():
     base_model = create_base_model(embedding_matrix)
     generator = create_generator(base_model)
 
+    os.makedirs('out', exist_ok=True)
+
     # MLE Training
     generator.fit(
         train_data,
         target_data,
         validation_split=0.1,
-        epochs=100
+        epochs=1000,
+        batch_size=128,
+        callbacks=[ModelCheckpoint('out/model.h5', save_best_only=True)]
     )
 
 if __name__ == '__main__':
