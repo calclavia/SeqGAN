@@ -1,18 +1,25 @@
 from keras.models import Model
-from keras.layers import Input, Dense, LSTM, Dropout, Embedding, Activation
+from keras.layers import *
 
 from constants import *
 
-def create_base_model():
+def create_base_model(embedding_matrix):
     """
     Base model shared by generator and discriminator.
     """
     seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
 
     # Conver to embedding space
-    x = Embedding(EMBEDDING_DIM, NUM_UNITS)(seq_input)
+    x = Embedding(
+        embedding_matrix.shape[0],
+        embedding_matrix.shape[1],
+        weights=[embedding_matrix],
+        trainable=False
+    )(seq_input)
 
-    # Simple LSTM with dropout
+    # LSTM with dropout
+    x = LSTM(NUM_UNITS, return_sequences=True)(x)
+    x = Dropout(0.5)(x)
     x = LSTM(NUM_UNITS, return_sequences=True)(x)
     x = Dropout(0.5)(x)
 
@@ -27,7 +34,7 @@ def create_generator(base_model):
     x = base_model(seq_input)
 
     # Prediction
-    x = Dense(NUM_VOCAB)(x)
+    x = Dense(MAX_VOCAB)(x)
     x = Activation('softmax')(x)
 
     model = Model(seq_input, x)

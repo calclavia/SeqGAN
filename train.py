@@ -6,7 +6,7 @@ import numpy as np
 from models import *
 from constants import *
 
-def load_data():
+def load_data(tokenizer):
     """
     Loads training data from file and processes it.
     """
@@ -19,7 +19,6 @@ def load_data():
         texts = text.split('\n\n')
 
     # Tokenize words
-    tokenizer = Tokenizer(num_words=NUM_VOCAB)
     tokenizer.fit_on_texts(texts)
     # A list of sequences. Each sequence has a different length.
     sequences = tokenizer.texts_to_sequences(texts)
@@ -33,20 +32,58 @@ def load_data():
     # Target data is training data shfited by one word
     target_data = pad_sequences(sequences[:][1:], maxlen=SEQ_LEN)
     # Convert to one-hot vector
-    target_data = np.array([to_categorical(seq, NUM_VOCAB) for seq in target_data])
+    target_data = np.array([to_categorical(seq, MAX_VOCAB) for seq in target_data])
 
     print('Shape of train_data tensor:', train_data.shape)
     print('Shape of target_data tensor:', target_data.shape)
     return train_data, target_data
 
-def main():
-    train_data, target_data = load_data()
+def load_embedding(tokenizer):
+    """
+    Loads a pre-trained word embedding into an embedding matrix
+    """
+    print('Loading word embeddings...')
+    embeddings_index = {}
+    fpath = 'data/glove.6B.100d.txt'
 
-    base_model = create_base_model()
+    with open(fpath, encoding='utf-8') as f:
+        for line in f:
+            values = line.split()
+            word = values[0]
+            coefs = np.asarray(values[1:], dtype='float32')
+            embeddings_index[word] = coefs
+
+    print('Found %s word vectors.' % len(embeddings_index))
+
+    embedding_matrix = np.zeros((len(tokenizer.word_index) + 1, EMBEDDING_DIM))
+
+    for word, i in tokenizer.word_index.items():
+        embedding_vector = embeddings_index.get(word)
+        if embedding_vector is not None:
+            # words not found in embedding index will be all-zeros.
+            embedding_matrix[i] = embedding_vector
+
+    return embedding_matrix
+
+def main():
+    # Create tokenizer
+    tokenizer = Tokenizer(num_words=MAX_VOCAB)
+    # Load data
+    train_data, target_data = load_data(tokenizer)
+    # Load embedding matrix
+    embedding_matrix = load_embedding(tokenizer)
+
+    # Create models
+    base_model = create_base_model(embedding_matrix)
     generator = create_generator(base_model)
 
     # MLE Training
-    generator.fit(train_data, target_data, validation_split=0.1, epochs=100)
+    generator.fit(
+        train_data,
+        target_data,
+        validation_split=0.1,
+        epochs=100
+    )
 
 if __name__ == '__main__':
     main()
