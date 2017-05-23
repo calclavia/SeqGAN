@@ -14,9 +14,8 @@ def load_data():
     fpath = 'data/obama.txt'
 
     with open(fpath, encoding='utf-8') as f:
-        # Split large text into paragraphs
         text = f.read()
-        print('Corpus char length:', len(text))
+        # Split large text into paragraphs
         texts = text.split('\n\n')
 
     # Tokenize words
@@ -25,6 +24,7 @@ def load_data():
     # A list of sequences. Each sequence has a different length.
     sequences = tokenizer.texts_to_sequences(texts)
 
+    print('Average sequence length:', np.mean([len(seq) for seq in sequences]))
     print('Found {} unique tokens.'.format(len(tokenizer.word_index)))
 
     # Create training data and target data.

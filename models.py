@@ -10,7 +10,7 @@ def create_base_model():
     seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
 
     # Conver to embedding space
-    x = Embedding(NUM_VOCAB, NUM_UNITS)(seq_input)
+    x = Embedding(EMBEDDING_DIM, NUM_UNITS)(seq_input)
 
     # Simple LSTM with dropout
     x = LSTM(NUM_UNITS, return_sequences=True)(x)
