@@ -82,7 +82,7 @@ def main():
         batch_size=128,
         callbacks=[
             ModelCheckpoint('out/model.h5', save_best_only=True),
-            EarlyStopping(patience=3)
+            EarlyStopping(patience=5)
         ]
     )
 
