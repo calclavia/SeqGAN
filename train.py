@@ -60,6 +60,8 @@ def main():
     with open('out/word_index.json', 'w') as f:
         json.dump(tokenizer.word_index, f)
 
+    generator.summary()
+
     # MLE Training
     generator.fit(
         train_data,

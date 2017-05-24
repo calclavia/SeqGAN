@@ -5,7 +5,6 @@ from keras.callbacks import ModelCheckpoint
 import random
 import numpy as np
 import os
-import json
 
 from models import *
 from constants import *
@@ -20,15 +19,11 @@ def main():
     """
     Main function executed to start training on dataset.
     """
-    # Create tokenizer
-    tokenizer = Tokenizer(num_words=MAX_VOCAB)
-
-    # TODO: Generator shouldn't need to load the dataset
-    texts = load_corpus()
-    tokenizer.fit_on_texts(texts)
+    # Load word index
+    word_index = load_json_dict('out/word_index.json')
 
     # Load embedding matrix
-    embedding_matrix = load_embedding(tokenizer.word_index)
+    embedding_matrix = load_embedding(word_index)
 
     # Create models
     base_model = create_base_model(embedding_matrix)
@@ -40,8 +35,7 @@ def main():
     generator.load_weights('out/model.h5')
 
     # Load word index
-    idx = tokenizer.word_index
-    inv_idx = {v: k for k, v in idx.items()}
+    inv_idx = {v: k for k, v in word_index.items()}
 
     # Generative sampling, store results in results, seed with current results
     results = [0 for _ in range(SEQ_LEN - 1)] + [random.randint(0, MAX_VOCAB)]
@@ -61,9 +55,14 @@ def main():
     # Ignore null words
     textual = [inv_idx[word] for word in results if word != 0]
 
-    # Print resulting sentence
-    print ('\nResulting Sentence, temp = ' + str(TEMP) + ':')
-    print (' '.join(textual))
+    # Print resulting sentences
+    print('\nResulting Sentence, temp = ' + str(TEMP) + ':')
+    joined_text = ' '.join(textual)
+    print(joined_text)
+
+    # Write result to file
+    with open('out/output.txt', 'w') as f:
+        f.write(joined_text)
 
 if __name__ == '__main__':
     main()

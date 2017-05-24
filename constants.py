@@ -5,4 +5,4 @@ EMBEDDING_DIM = 100
 NUM_UNITS = 512
 
 # Generation Parameters
-TEMP = .8
+TEMP = .6
