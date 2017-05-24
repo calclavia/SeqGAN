@@ -2,6 +2,9 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 from keras.callbacks import ModelCheckpoint
+
+from nltk.tokenize import sent_tokenize
+
 import numpy as np
 import os
 import json
@@ -16,7 +19,9 @@ def load_data(tokenizer):
     """
     print('Loading data...')
     # Prepare the tokenizer
-    texts = load_corpus()
+    text = load_corpus()
+    # Split based on sentences
+    texts = sent_tokenize(text)
 
     tokenizer.fit_on_texts(texts)
     # A list of sequences. Each sequence has a different length.
@@ -68,8 +73,10 @@ def main():
         target_data,
         validation_split=0.1,
         epochs=1000,
-        batch_size=128,
-        callbacks=[ModelCheckpoint('out/model.h5', save_best_only=True)]
+        batch_size=256,
+        callbacks=[
+            ModelCheckpoint('out/model.h5', save_best_only=True)
+        ]
     )
 
 if __name__ == '__main__':

@@ -10,8 +10,7 @@ def load_corpus():
     fpath = 'data/obama.txt'
     with open(fpath, encoding='utf-8') as f:
         text = f.read()
-        texts = text.split('\n\n')
-    return texts
+    return text
 
 def load_embedding(word_index):
     """
