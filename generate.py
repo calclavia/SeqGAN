@@ -32,8 +32,8 @@ def generate(generator, length=GEN_LEN):
         choice = sample(distr, temp=TEMP)
         results.append(choice)
 
-    # Ignore null words
-    return [word for word in results if word != 0]
+    # Slice out the last words (Ignore the buffer)
+    return results[-length:]
 
 def main():
     """
@@ -59,7 +59,8 @@ def main():
 
     results = generate(generator)
 
-    textual = [inv_idx[word] for word in results]
+    # Ignore null words
+    textual = [inv_idx[word] for word in results if word != 0]
 
     # Print resulting sentences
     print('\nResulting Sentence, temp = ' + str(TEMP) + ':')
