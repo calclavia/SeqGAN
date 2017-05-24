@@ -5,7 +5,8 @@ NUM_UNITS = 256
 
 # Training Parameters
 SEQ_LEN = 20
-NUM_FAKE = 10000
+NUM_FAKE = 1024 * 10
+BATCH_SIZE = 128
 
 # Generation Parameters
 TEMP = .7

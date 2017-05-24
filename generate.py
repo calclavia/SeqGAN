@@ -9,10 +9,11 @@ import os
 from models import *
 from constants import *
 from util import *
+import argparse
 
 def sample(distr, temp=1.0):
     distr = np.log(distr) / temp
-    distr = np.exp(distr) / np.sum(np.exp(distr))
+    distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
     return [np.random.choice(MAX_VOCAB, 1, p=distr[b])[0] for b in range(distr.shape[0])]
 
 def generate(generator, length=GEN_LEN, batch=1):
@@ -27,7 +28,7 @@ def generate(generator, length=GEN_LEN, batch=1):
         distr = np.array(distr)
         # Pick the last result for each batch
         distr = distr[:, -1]
-        choices = np.array(sample(distr, temp=TEMP))
+        choices = np.reshape(sample(distr, temp=TEMP), [-1, 1])
         results = np.hstack([results, choices])
 
     # Slice out the last words (Ignore the buffer)
@@ -62,19 +63,20 @@ def main():
     # Load word index
     inv_idx = {v: k for k, v in word_index.items()}
 
-    results = generate(generator, parser.gen_len, parser.gen_count)[0]
+    results = generate(generator, args.gen_len, args.gen_count)
 
     # Ignore null words
-    textual = [inv_idx[word] for word in results if word != 0]
+    for i, result in enumerate(results):
+        textual = [inv_idx[word] for word in result if word != 0]
 
-    # Print resulting sentences
-    print('\nResulting Sentence, temp = ' + str(TEMP) + ':')
-    joined_text = ' '.join(textual)
-    print(joined_text)
+        # Print resulting sentences
+        print('\nResulting Sentence, temp = ' + str(TEMP) + ':')
+        joined_text = ' '.join(textual)
+        print(joined_text)
 
-    # Write result to file
-    with open('out/output.txt', 'w') as f:
-        f.write(joined_text)
+        # Write result to file
+        with open('out/output_{}.txt'.format(i), 'w') as f:
+            f.write(joined_text)
 
 if __name__ == '__main__':
     main()

@@ -92,7 +92,7 @@ def main():
             target_data,
             validation_split=0.1,
             epochs=1000,
-            batch_size=128,
+            batch_size=BATCH_SIZE,
             callbacks=[
                 ModelCheckpoint(G_MODEL_PATH, save_best_only=True),
                 EarlyStopping(patience=5)
@@ -107,7 +107,8 @@ def main():
     # Generate fake samples
     num_real = train_data.shape[0]
     print('Generating {} fake samples...'.format(NUM_FAKE))
-    fake_samples = [generate(generator, SEQ_LEN) for i in tqdm(range(NUM_FAKE))]
+    fake_batches = [generate(generator, SEQ_LEN, batch=1024) for i in tqdm(range(NUM_FAKE // 1024))]
+    fake_samples = np.concatenate(fake_batches, axis=0)
 
     # Generate discriminator train and targets
     d_train = np.concatenate([np.array(fake_samples), train_data], axis=0)
@@ -119,7 +120,7 @@ def main():
         d_targets,
         validation_split=0.1,
         epochs=1000,
-        batch_size=128,
+        batch_size=BATCH_SIZE,
         callbacks=[
             ModelCheckpoint(D_MODEL_PATH, save_best_only=True),
             EarlyStopping(patience=5)
