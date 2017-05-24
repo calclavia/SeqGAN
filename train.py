@@ -25,16 +25,21 @@ def load_data(tokenizer):
     text = load_corpus()
 
     # Split based on sentences
-    texts = sent_tokenize(text)
+    sentences = sent_tokenize(text)
 
-    tokenizer.fit_on_texts(texts)
+    tokenizer.fit_on_texts(sentences)
 
     # A list of sequences. Each sequence has a different length.
-    sequences = tokenizer.texts_to_sequences(texts)
+    sentences = tokenizer.texts_to_sequences(sentences)
 
-    # Add null character to beginning of each sequence
-    sequences = [[0] + x for x in sequences]
+    sequences = []
 
+    # Slice long sentences into subsequences of SEQ_LEN
+    for sent in sentences:
+        for i in range(0, len(sent) - SEQ_LEN + 1, TRAIN_WINDOW):
+            sequences.append(sent[i: i + SEQ_LEN])
+
+    print('Number of sequences:', len(sequences))
     print('Average sequence length:', np.mean([len(seq) for seq in sequences]))
     print('Max sequence length:', max([len(seq) for seq in sequences]))
     print('Found {} unique tokens.'.format(len(tokenizer.word_index)))
@@ -44,8 +49,7 @@ def load_data(tokenizer):
     train_data = pad_sequences([x[:-1] for x in sequences], maxlen=SEQ_LEN)
     # Target data is training data shfited by one word
     target_data = pad_sequences([x[1:] for x in sequences], maxlen=SEQ_LEN)
-    # TODO: Process training data to be more similar to generation
-    # TODO: Vocab size seems to be a limitation in what outputs it can make...
+    # TODO: Vocab size seems to be a limits outputs
 
     # Convert to one-hot vector
     target_data = np.array([to_categorical(seq, MAX_VOCAB) for seq in target_data])
@@ -107,7 +111,7 @@ def main():
     # Generate fake samples
     num_real = train_data.shape[0]
     print('Generating {} fake samples...'.format(NUM_FAKE))
-    fake_batches = [generate(generator, SEQ_LEN, batch=1024) for i in tqdm(range(NUM_FAKE // 1024))]
+    fake_batches = [generate(generator, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
     fake_samples = np.concatenate(fake_batches, axis=0)
 
     # Generate discriminator train and targets
