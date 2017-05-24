@@ -7,6 +7,7 @@ from nltk.tokenize import sent_tokenize
 from tqdm import tqdm
 
 import numpy as np
+import argparse
 import os
 import json
 
@@ -56,6 +57,12 @@ def main():
     """
     Main function executed to start training on dataset.
     """
+    parser = argparse.ArgumentParser(description='Trains the model.')
+    parser.add_argument('--skip-gen-pretrain', dest='pretrain_gen', action='store_false')
+    parser.set_defaults(pretrain_gen=True)
+
+    args = parser.parse_args()
+
     # Create tokenizer
     tokenizer = Tokenizer(num_words=MAX_VOCAB)
     # Load data
@@ -77,21 +84,24 @@ def main():
     generator.summary()
 
     # MLE Pre-training
-    print('Pre-training generator...')
-    generator.fit(
-        train_data,
-        target_data,
-        validation_split=0.1,
-        epochs=1000,
-        batch_size=128,
-        callbacks=[
-            ModelCheckpoint('out/generator.h5', save_best_only=True),
-            EarlyStopping(patience=5)
-        ]
-    )
-    
+    if args.pretrain_gen:
+        print('Pre-training generator...')
+        generator.fit(
+            train_data,
+            target_data,
+            validation_split=0.1,
+            epochs=1000,
+            batch_size=128,
+            callbacks=[
+                ModelCheckpoint(G_MODEL_PATH, save_best_only=True),
+                EarlyStopping(patience=5)
+            ]
+        )
+    else:
+        generator.load_weights(G_MODEL_PATH)
+
     # TODO: The discriminator may catestrophically interfere with shared model
-    # TODO: Consider freezing weights of perform parallel training.
+    # TODO: Consider freezing weights or perform parallel training.
 
     # Generate fake samples
     num_real = train_data.shape[0]
@@ -110,7 +120,7 @@ def main():
         epochs=1000,
         batch_size=128,
         callbacks=[
-            ModelCheckpoint('out/discriminator.h5', save_best_only=True),
+            ModelCheckpoint(D_MODEL_PATH, save_best_only=True),
             EarlyStopping(patience=5)
         ]
     )

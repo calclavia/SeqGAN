@@ -10,3 +10,7 @@ NUM_FAKE = 10000
 # Generation Parameters
 TEMP = .7
 GEN_LEN = 64
+
+# Paths
+G_MODEL_PATH = 'out/generator.h5'
+D_MODEL_PATH = 'out/discriminator.h5'

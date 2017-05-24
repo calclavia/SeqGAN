@@ -52,7 +52,7 @@ def main():
     os.makedirs('out', exist_ok=True)
 
     # Load in model weights
-    generator.load_weights('out/generator.h5')
+    generator.load_weights(G_MODEL_PATH)
 
     # Load word index
     inv_idx = {v: k for k, v in word_index.items()}
