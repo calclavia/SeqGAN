@@ -64,7 +64,9 @@ def main():
     """
     parser = argparse.ArgumentParser(description='Trains the model.')
     parser.add_argument('--skip-gen-pretrain', dest='pretrain_gen', action='store_false')
+    parser.add_argument('--skip-dis-pretrain', dest='pretrain_dis', action='store_false')
     parser.set_defaults(pretrain_gen=True)
+    parser.set_defaults(pretrain_dis=True)
 
     args = parser.parse_args()
 
@@ -105,31 +107,34 @@ def main():
     else:
         generator.load_weights(G_MODEL_PATH)
 
-    # TODO: The discriminator may catestrophically interfere with shared model
-    # TODO: Consider freezing weights or perform parallel training.
+    if args.pretrain_dis:
+        # TODO: The discriminator may catestrophically interfere with shared model
+        # TODO: Consider freezing weights or perform parallel training?
 
-    # Generate fake samples
-    num_real = train_data.shape[0]
-    print('Generating {} fake samples...'.format(NUM_FAKE))
-    fake_batches = [generate(generator, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
-    fake_samples = np.concatenate(fake_batches, axis=0)
+        # Generate fake samples
+        num_real = train_data.shape[0]
+        print('Generating {} fake samples...'.format(NUM_FAKE))
+        fake_batches = [generate(generator, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
+        fake_samples = np.concatenate(fake_batches, axis=0)
 
-    # Generate discriminator train and targets
-    d_train = np.concatenate([np.array(fake_samples), train_data], axis=0)
-    d_targets = np.concatenate([np.zeros((NUM_FAKE,)), np.ones((num_real,))])
+        # Generate discriminator train and targets
+        d_train = np.concatenate([np.array(fake_samples), train_data], axis=0)
+        d_targets = np.concatenate([np.zeros((NUM_FAKE,)), np.ones((num_real,))])
 
-    print('Pre-training discriminator...')
-    discriminator.fit(
-        d_train,
-        d_targets,
-        validation_split=0.1,
-        epochs=1000,
-        batch_size=BATCH_SIZE,
-        callbacks=[
-            ModelCheckpoint(D_MODEL_PATH, save_best_only=True),
-            EarlyStopping(patience=5)
-        ]
-    )
+        print('Pre-training discriminator...')
+        discriminator.fit(
+            d_train,
+            d_targets,
+            validation_split=0.1,
+            epochs=1000,
+            batch_size=BATCH_SIZE,
+            callbacks=[
+                ModelCheckpoint(D_MODEL_PATH, save_best_only=True),
+                EarlyStopping(patience=5)
+            ]
+        )
+    else:
+        discriminator.load_weights(D_MODEL_PATH)
 
 if __name__ == '__main__':
     main()
