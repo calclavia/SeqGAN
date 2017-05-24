@@ -1,8 +1,9 @@
-SEQ_LEN = 16
+SEQ_LEN = 32
 MAX_VOCAB = 1024
 
 EMBEDDING_DIM = 100
 NUM_UNITS = 512
 
 # Generation Parameters
-TEMP = .6
+TEMP = .8
+GEN_LEN = 64

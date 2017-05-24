@@ -17,13 +17,13 @@ def create_base_model(embedding_matrix):
         trainable=False
     )(seq_input)
 
-    x = Dropout(0.2)(x)
+    x = Dropout(0.1)(x)
 
     # LSTM with dropout
     x = LSTM(NUM_UNITS, return_sequences=True)(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.25)(x)
     x = LSTM(NUM_UNITS, return_sequences=True)(x)
-    x = Dropout(0.5)(x)
+    x = Dropout(0.25)(x)
 
     return Model(seq_input, x)
 

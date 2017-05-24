@@ -1,7 +1,7 @@
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 from nltk.tokenize import sent_tokenize
 
@@ -20,14 +20,20 @@ def load_data(tokenizer):
     print('Loading data...')
     # Prepare the tokenizer
     text = load_corpus()
+
     # Split based on sentences
     texts = sent_tokenize(text)
 
     tokenizer.fit_on_texts(texts)
+
     # A list of sequences. Each sequence has a different length.
     sequences = tokenizer.texts_to_sequences(texts)
 
+    # Add null character to beginning of each sequence
+    sequences = [[0] + x for x in sequences]
+
     print('Average sequence length:', np.mean([len(seq) for seq in sequences]))
+    print('Max sequence length:', max([len(seq) for seq in sequences]))
     print('Found {} unique tokens.'.format(len(tokenizer.word_index)))
 
     # Create training data and target data.
@@ -73,9 +79,10 @@ def main():
         target_data,
         validation_split=0.1,
         epochs=1000,
-        batch_size=256,
+        batch_size=128,
         callbacks=[
-            ModelCheckpoint('out/model.h5', save_best_only=True)
+            ModelCheckpoint('out/model.h5', save_best_only=True),
+            EarlyStopping(patience=3)
         ]
     )
 

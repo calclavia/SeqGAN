@@ -38,9 +38,9 @@ def main():
     inv_idx = {v: k for k, v in word_index.items()}
 
     # Generative sampling, store results in results, seed with current results
-    results = [0 for _ in range(SEQ_LEN - 1)] + [random.randint(0, MAX_VOCAB)]
+    results = [0 for _ in range(SEQ_LEN)]# + [random.randint(0, MAX_VOCAB)]
 
-    for i in range(SEQ_LEN):
+    for i in range(GEN_LEN):
         # Take the last SEQ_LEN results and feed it in.
         last_results = results[-SEQ_LEN:]
         # Create batch dimension
