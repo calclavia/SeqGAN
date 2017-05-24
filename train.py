@@ -44,6 +44,7 @@ def load_data(tokenizer):
     train_data = pad_sequences([x[:-1] for x in sequences], maxlen=SEQ_LEN)
     # Target data is training data shfited by one word
     target_data = pad_sequences([x[1:] for x in sequences], maxlen=SEQ_LEN)
+    # TODO: Process training data to be more similar to generation
     # TODO: Vocab size seems to be a limitation in what outputs it can make...
 
     # Convert to one-hot vector

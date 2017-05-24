@@ -10,30 +10,29 @@ from models import *
 from constants import *
 from util import *
 
-def sample(distribution, temp=1.0):
-    distr = np.log(distribution) / temp
+def sample(distr, temp=1.0):
+    distr = np.log(distr) / temp
     distr = np.exp(distr) / np.sum(np.exp(distr))
-    return np.random.choice(MAX_VOCAB, 1, p=distr)[0]
+    return [np.random.choice(MAX_VOCAB, 1, p=distr[b])[0] for b in range(distr.shape[0])]
 
-def generate(generator, length=GEN_LEN):
-    # TODO: Handle batch generation to make things faster?
+def generate(generator, length=GEN_LEN, batch=1):
     # Generative sampling, store results in results, seed with current results
-    results = [0 for _ in range(SEQ_LEN)]
+    results = np.zeros((batch, SEQ_LEN))
 
     for i in range(length):
         # Take the last SEQ_LEN results and feed it in.
-        last_results = results[-SEQ_LEN:]
-        # Create batch dimension
-        feed = np.reshape(last_results, [1, -1])
+        feed = results[:, -SEQ_LEN:]
 
         distr = generator.predict(feed)
-        # Pick the last result
-        distr = distr[0][-1]
+        distr = np.array(distr)
+        # Pick the last result for each batch
+        distr = distr[:, -1]
         choice = sample(distr, temp=TEMP)
-        results.append(choice)
+        results = np.hstack([results, choice])
 
     # Slice out the last words (Ignore the buffer)
-    return results[-length:]
+    results = np.array(results)
+    return results[:, -length:]
 
 def main():
     """
@@ -57,7 +56,7 @@ def main():
     # Load word index
     inv_idx = {v: k for k, v in word_index.items()}
 
-    results = generate(generator)
+    results = generate(generator)[0]
 
     # Ignore null words
     textual = [inv_idx[word] for word in results if word != 0]
