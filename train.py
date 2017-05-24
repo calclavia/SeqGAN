@@ -8,20 +8,16 @@ import json
 
 from models import *
 from constants import *
+from util import *
 
 def load_data(tokenizer):
     """
     Loads training data from file and processes it.
     """
     print('Loading data...')
-    fpath = 'data/obama.txt'
+    # Prepare the tokenizer
+    texts = load_corpus()
 
-    with open(fpath, encoding='utf-8') as f:
-        text = f.read()
-        # Split large text into paragraphs
-        texts = text.split('\n\n')
-
-    # Tokenize words
     tokenizer.fit_on_texts(texts)
     # A list of sequences. Each sequence has a different length.
     sequences = tokenizer.texts_to_sequences(texts)
@@ -43,33 +39,6 @@ def load_data(tokenizer):
     print('Shape of target_data tensor:', target_data.shape)
     return train_data, target_data
 
-def load_embedding(tokenizer):
-    """
-    Loads a pre-trained word embedding into an embedding matrix
-    """
-    print('Loading word embeddings...')
-    embeddings_index = {}
-    fpath = 'data/glove.6B.100d.txt'
-
-    with open(fpath, encoding='utf-8') as f:
-        for line in f:
-            values = line.split()
-            word = values[0]
-            coefs = np.asarray(values[1:], dtype='float32')
-            embeddings_index[word] = coefs
-
-    print('Found %s word vectors.' % len(embeddings_index))
-
-    embedding_matrix = np.zeros((len(tokenizer.word_index) + 1, EMBEDDING_DIM))
-
-    for word, i in tokenizer.word_index.items():
-        embedding_vector = embeddings_index.get(word)
-        if embedding_vector is not None:
-            # words not found in embedding index will be all-zeros.
-            embedding_matrix[i] = embedding_vector
-
-    return embedding_matrix
-
 def main():
     """
     Main function executed to start training on dataset.
@@ -79,7 +48,7 @@ def main():
     # Load data
     train_data, target_data = load_data(tokenizer)
     # Load embedding matrix
-    embedding_matrix = load_embedding(tokenizer)
+    embedding_matrix = load_embedding(tokenizer.word_index)
 
     # Create models
     base_model = create_base_model(embedding_matrix)

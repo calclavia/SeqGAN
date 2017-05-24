@@ -3,3 +3,6 @@ MAX_VOCAB = 2048
 
 EMBEDDING_DIM = 100
 NUM_UNITS = 512
+
+# Generation Parameters
+TEMP = .8
