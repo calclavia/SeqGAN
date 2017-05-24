@@ -27,8 +27,8 @@ def generate(generator, length=GEN_LEN, batch=1):
         distr = np.array(distr)
         # Pick the last result for each batch
         distr = distr[:, -1]
-        choice = sample(distr, temp=TEMP)
-        results = np.hstack([results, choice])
+        choices = np.array(sample(distr, temp=TEMP))
+        results = np.hstack([results, choices])
 
     # Slice out the last words (Ignore the buffer)
     results = np.array(results)
@@ -38,6 +38,12 @@ def main():
     """
     Main function executed to start training on dataset.
     """
+    parser = argparse.ArgumentParser(description='Trains the model.')
+    parser.add_argument('--len', dest='gen_len', type=int, default=GEN_LEN)
+    parser.add_argument('--count', dest='gen_count', type=int, default=1)
+
+    args = parser.parse_args()
+
     # Load word index
     word_index = load_json_dict('out/word_index.json')
 
@@ -56,7 +62,7 @@ def main():
     # Load word index
     inv_idx = {v: k for k, v in word_index.items()}
 
-    results = generate(generator)[0]
+    results = generate(generator, parser.gen_len, parser.gen_count)[0]
 
     # Ignore null words
     textual = [inv_idx[word] for word in results if word != 0]
