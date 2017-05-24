@@ -44,19 +44,22 @@ def main():
     inv_idx = {v: k for k, v in idx.items()}
 
     # Generative sampling, store results in results, seed with current results
-    results = np.zeros([1, SEQ_LEN])
-    seed = np.zeros([1, SEQ_LEN])
-    seed[0][0] = random.randint(0, MAX_VOCAB)
+    results = [0 for _ in range(SEQ_LEN - 1)] + [random.randint(0, MAX_VOCAB)]
 
-    for i in range(1, SEQ_LEN):
-        chosen = generator.predict(seed)
-        distr = chosen[0][i]
+    for i in range(SEQ_LEN):
+        # Take the last SEQ_LEN results and feed it in.
+        last_results = results[-SEQ_LEN:]
+        # Create batch dimension
+        feed = np.reshape(last_results, [1, -1])
+
+        distr = generator.predict(feed)
+        # Pick the last result
+        distr = distr[0][-1]
         choice = sample(distr, temp=TEMP)
-        results[0][i-1] = choice
-        seed = results
+        results.append(choice)
 
-    final_sequence = results[0][:-1].astype(int)
-    textual = [inv_idx[word] for word in final_sequence]
+    # Ignore null words
+    textual = [inv_idx[word] for word in results if word != 0]
 
     # Print resulting sentence
     print ('\nResulting Sentence, temp = ' + str(TEMP) + ':')

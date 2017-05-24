@@ -38,3 +38,7 @@ def load_embedding(word_index):
             embedding_matrix[i] = embedding_vector
 
     return embedding_matrix
+
+def load_json_dict(fpath):
+    with open(fpath, encoding='utf-8') as f:
+        return json.loads(f.read())
