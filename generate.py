@@ -15,6 +15,26 @@ def sample(distribution, temp=1.0):
     distr = np.exp(distr) / np.sum(np.exp(distr))
     return np.random.choice(MAX_VOCAB, 1, p=distr)[0]
 
+def generate(generator, length=GEN_LEN):
+    # TODO: Handle batch generation to make things faster?
+    # Generative sampling, store results in results, seed with current results
+    results = [0 for _ in range(SEQ_LEN)]
+
+    for i in range(length):
+        # Take the last SEQ_LEN results and feed it in.
+        last_results = results[-SEQ_LEN:]
+        # Create batch dimension
+        feed = np.reshape(last_results, [1, -1])
+
+        distr = generator.predict(feed)
+        # Pick the last result
+        distr = distr[0][-1]
+        choice = sample(distr, temp=TEMP)
+        results.append(choice)
+
+    # Ignore null words
+    return [word for word in results if word != 0]
+
 def main():
     """
     Main function executed to start training on dataset.
@@ -32,28 +52,14 @@ def main():
     os.makedirs('out', exist_ok=True)
 
     # Load in model weights
-    generator.load_weights('out/model.h5')
+    generator.load_weights('out/generator.h5')
 
     # Load word index
     inv_idx = {v: k for k, v in word_index.items()}
 
-    # Generative sampling, store results in results, seed with current results
-    results = [0 for _ in range(SEQ_LEN)]# + [random.randint(0, MAX_VOCAB)]
+    results = generate(generator)
 
-    for i in range(GEN_LEN):
-        # Take the last SEQ_LEN results and feed it in.
-        last_results = results[-SEQ_LEN:]
-        # Create batch dimension
-        feed = np.reshape(last_results, [1, -1])
-
-        distr = generator.predict(feed)
-        # Pick the last result
-        distr = distr[0][-1]
-        choice = sample(distr, temp=TEMP)
-        results.append(choice)
-
-    # Ignore null words
-    textual = [inv_idx[word] for word in results if word != 0]
+    textual = [inv_idx[word] for word in results]
 
     # Print resulting sentences
     print('\nResulting Sentence, temp = ' + str(TEMP) + ':')

@@ -35,14 +35,40 @@ def create_generator(base_model):
 
     x = base_model(seq_input)
 
-    # Prediction
+    x = LSTM(NUM_UNITS, return_sequences=True)(x)
+    x = Dropout(0.5)(x)
+
+    # Prediction (probability)
     x = Dense(MAX_VOCAB)(x)
     x = Activation('softmax')(x)
 
     model = Model(seq_input, x)
     model.compile(
         optimizer='nadam',
-        loss='categorical_crossentropy',
+        loss='categorical_crossentropy'
+    )
+
+    return model
+
+def create_discriminator(base_model):
+    """
+    Discriminator model
+    """
+    seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
+
+    x = base_model(seq_input)
+
+    x = LSTM(NUM_UNITS)(x)
+    x = Dropout(0.5)(x)
+
+    # Prediction (1 = real, 0 = fake)
+    x = Dense(1)(x)
+    x = Activation('sigmoid')(x)
+
+    model = Model(seq_input, x)
+    model.compile(
+        optimizer='nadam',
+        loss='binary_crossentropy',
         metrics=['acc']
     )
 

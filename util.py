@@ -2,6 +2,7 @@ import numpy as np
 import json
 
 from constants import *
+from tqdm import tqdm
 
 def load_corpus():
     """
@@ -31,7 +32,7 @@ def load_embedding(word_index):
 
     embedding_matrix = np.zeros((len(word_index) + 1, EMBEDDING_DIM))
 
-    for word, i in word_index.items():
+    for word, i in tqdm(word_index.items()):
         embedding_vector = embeddings_index.get(word)
         if embedding_vector is not None:
             # words not found in embedding index will be all-zeros.

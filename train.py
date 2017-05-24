@@ -4,6 +4,7 @@ from keras.utils import to_categorical
 from keras.callbacks import ModelCheckpoint, EarlyStopping
 
 from nltk.tokenize import sent_tokenize
+from tqdm import tqdm
 
 import numpy as np
 import os
@@ -12,6 +13,7 @@ import json
 from models import *
 from constants import *
 from util import *
+from generate import generate
 
 def load_data(tokenizer):
     """
@@ -64,6 +66,7 @@ def main():
     # Create models
     base_model = create_base_model(embedding_matrix)
     generator = create_generator(base_model)
+    discriminator = create_discriminator(base_model)
 
     os.makedirs('out', exist_ok=True)
 
@@ -73,7 +76,8 @@ def main():
 
     generator.summary()
 
-    # MLE Training
+    # MLE Pre-training
+    print('Pre-training generator...')
     generator.fit(
         train_data,
         target_data,
@@ -81,7 +85,32 @@ def main():
         epochs=1000,
         batch_size=128,
         callbacks=[
-            ModelCheckpoint('out/model.h5', save_best_only=True),
+            ModelCheckpoint('out/generator.h5', save_best_only=True),
+            EarlyStopping(patience=5)
+        ]
+    )
+    
+    # TODO: The discriminator may catestrophically interfere with shared model
+    # TODO: Consider freezing weights of perform parallel training.
+
+    # Generate fake samples
+    num_real = train_data.shape[0]
+    print('Generating {} fake samples...'.format(NUM_FAKE))
+    fake_samples = [generate(generator, SEQ_LEN) for i in tqdm(range(NUM_FAKE))]
+
+    # Generate discriminator train and targets
+    d_train = np.concatenate([np.array(fake_samples), train_data], axis=0)
+    d_targets = np.concatenate([np.zeros((NUM_FAKE,)), np.ones((num_real,))])
+
+    print('Pre-training discriminator...')
+    discriminator.fit(
+        d_train,
+        d_targets,
+        validation_split=0.1,
+        epochs=1000,
+        batch_size=128,
+        callbacks=[
+            ModelCheckpoint('out/discriminator.h5', save_best_only=True),
             EarlyStopping(patience=5)
         ]
     )
