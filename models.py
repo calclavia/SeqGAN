@@ -10,7 +10,8 @@ def pg_loss(advantage):
         Policy gradient loss
         """
         # L = \sum{A * log(p)}
-        return K.sum(advantage * K.log(y_true * y_pred))
+        responsible_outputs = K.sum(y_true * y_pred)
+        return -K.sum(advantage * K.log(responsible_outputs))
     return f
 
 def create_base_model(embedding_matrix):
@@ -71,7 +72,7 @@ def mle(generator):
 
 def pg(generator):
     """
-    Wraps the generator in an policy gradient model
+    Wraps the generator in a policy gradient model
     """
     seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
     # Advantages for loss function
@@ -82,7 +83,7 @@ def pg(generator):
     model = Model([seq_input, adv_input], x)
     model.compile(
         optimizer='nadam',
-        loss=pg_loss(adv_input, chosen_input)
+        loss=pg_loss(adv_input)
     )
 
     return model

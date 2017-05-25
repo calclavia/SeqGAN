@@ -10,11 +10,12 @@ import numpy as np
 import argparse
 import os
 import json
+from collections import deque
 
 from models import *
 from constants import *
 from util import *
-from generate import generate
+from generate import *
 
 def load_data(tokenizer):
     """
@@ -78,9 +79,10 @@ def main():
     embedding_matrix = load_embedding(tokenizer.word_index)
 
     # Create models
-    base_model = create_base_model(embedding_matrix)
-    generator = create_generator(base_model)
-    discriminator = create_discriminator(base_model)
+    # TODO: Do model sharing later
+    # base_model = create_base_model(embedding_matrix)
+    generator = create_generator(create_base_model(embedding_matrix))
+    discriminator = create_discriminator(create_base_model(embedding_matrix))
 
     os.makedirs('out', exist_ok=True)
 
@@ -101,14 +103,16 @@ def main():
             epochs=1000,
             batch_size=BATCH_SIZE,
             callbacks=[
-                ModelCheckpoint(G_MODEL_PATH, save_best_only=True),
                 EarlyStopping(patience=5)
             ]
         )
+
+        generator.save_weights(G_MODEL_PATH)
     else:
         generator.load_weights(G_MODEL_PATH)
 
     if args.pretrain_dis:
+        # TODO: This is sort of redundant, since the GAN part should already be training discriminator. Modulate this.
         # TODO: The discriminator may catestrophically interfere with shared model
         # TODO: Consider freezing weights or perform parallel training?
         # Generate fake samples
@@ -140,29 +144,41 @@ def main():
     print('GAN training...')
     pg_generator = pg(generator)
 
-    for e in range(100):
-        print('=== Epoch {} ==='.format(e))
+    running_rewards = deque(maxlen=100)
+    t = tqdm(range(10000))
+
+    for e in t:
         ## Train generator
         # Perform rollouts
-        inputs, outputs = rollout(generator, SEQ_LEN, BATCH_SIZE)
+        outputs = generate(generator, SEQ_LEN, ROLLOUT_BATCH)
 
         # Compute advantages/rewards per rollout using D
         rewards = discriminator.predict(outputs)
 
         # Advantages has shape (batch, 1)
-        # TODO: Normalize advantages
-        advantages = rewards
+        # Normalize advantages
+        avg_rewards = np.mean(rewards)
+        # TODO: Should we discount the rewards?
+        advantages = (rewards - avg_rewards) / np.std(rewards)
+
+        # Update progress bar
+        running_rewards.append(avg_rewards)
+        t.set_postfix(reward=np.mean(running_rewards))
+
+        # Recreate inputs by shifting output to the right
+        inputs = np.pad(outputs[:, 1:], ((0, 0), (1, 0)), 'constant')
 
         # Convert outputs into one-hot version to use as target labels
         chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
 
         # Perform gradient updates
-        pg_generator.fit([inputs, advantages], chosen, batch_size=BATCH_SIZE)
+        pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
         # TODO: Sample real data randomly = # of fake data
         # TODO: Train to classify fake and real data
-
+        if e % 10 == 0:
+            generator.save_weights(RL_G_MODEL_PATH)
 
 if __name__ == '__main__':
     main()
