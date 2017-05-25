@@ -88,12 +88,13 @@ def main():
     with open('out/word_index.json', 'w') as f:
         json.dump(tokenizer.word_index, f)
 
-    generator.summary()
-
     # MLE Pre-training
     if args.pretrain_gen:
         print('Pre-training generator...')
-        generator.fit(
+        # Wrap the generator with MLE loss
+        mle_generator = mle(generator)
+
+        mle_generator.fit(
             train_data,
             target_data,
             validation_split=0.1,
@@ -110,7 +111,6 @@ def main():
     if args.pretrain_dis:
         # TODO: The discriminator may catestrophically interfere with shared model
         # TODO: Consider freezing weights or perform parallel training?
-
         # Generate fake samples
         num_real = train_data.shape[0]
         print('Generating {} fake samples...'.format(NUM_FAKE))
@@ -135,6 +135,34 @@ def main():
         )
     else:
         discriminator.load_weights(D_MODEL_PATH)
+
+    # GAN Training
+    print('GAN training...')
+    pg_generator = pg(generator)
+
+    for e in range(100):
+        print('=== Epoch {} ==='.format(e))
+        ## Train generator
+        # Perform rollouts
+        inputs, outputs = rollout(generator, SEQ_LEN, BATCH_SIZE)
+
+        # Compute advantages/rewards per rollout using D
+        rewards = discriminator.predict(outputs)
+
+        # Advantages has shape (batch, 1)
+        # TODO: Normalize advantages
+        advantages = rewards
+
+        # Convert outputs into one-hot version to use as target labels
+        chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
+
+        # Perform gradient updates
+        pg_generator.fit([inputs, advantages], chosen, batch_size=BATCH_SIZE)
+
+        ## Train discriminator
+        # TODO: Sample real data randomly = # of fake data
+        # TODO: Train to classify fake and real data
+
 
 if __name__ == '__main__':
     main()

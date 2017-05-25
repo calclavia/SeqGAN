@@ -16,24 +16,32 @@ def sample(distr, temp=1.0):
     distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
     return [np.random.choice(MAX_VOCAB, 1, p=distr[b])[0] for b in range(distr.shape[0])]
 
-def generate(generator, length=GEN_LEN, batch=1):
-    # Generative sampling, store results in results, seed with current results
-    results = np.zeros((batch, SEQ_LEN))
+def rollout(generator, length=GEN_LEN, batch=1):
+    # Generative sampling
+    outputs = np.zeros((batch, SEQ_LEN))
+    inputs = []
 
     for i in range(length):
-        # Take the last SEQ_LEN results and feed it in.
-        feed = results[:, -SEQ_LEN:]
+        # Take the last SEQ_LEN outputs and feed it in.
+        feed = outputs[:, -SEQ_LEN:]
+
+        # Track all inputs used
+        inputs.append(feed)
 
         distr = generator.predict(feed)
         distr = np.array(distr)
         # Pick the last result for each batch
         distr = distr[:, -1]
         choices = np.reshape(sample(distr, temp=TEMP), [-1, 1])
-        results = np.hstack([results, choices])
+        outputs = np.hstack([outputs, choices])
 
+    inputs = np.array(inputs)
     # Slice out the last words (Ignore the buffer)
-    results = np.array(results)
-    return results[:, -length:]
+    outputs = np.array(outputs)
+    return inputs, outputs[:, -length:]
+
+def generate(generator, length=GEN_LEN, batch=1):
+    return rollout(generator, length, batch)[1]
 
 def main():
     """

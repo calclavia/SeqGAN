@@ -1,7 +1,17 @@
 from keras.models import Model
 from keras.layers import *
+from keras import backend as K
 
 from constants import *
+
+def pg_loss(advantage):
+    def f(y_true, y_pred):
+        """
+        Policy gradient loss
+        """
+        # L = \sum{A * log(p)}
+        return K.sum(advantage * K.log(y_true * y_pred))
+    return f
 
 def create_base_model(embedding_matrix):
     """
@@ -41,9 +51,38 @@ def create_generator(base_model):
     x = Activation('softmax')(x)
 
     model = Model(seq_input, x)
+    return model
+
+def mle(generator):
+    """
+    Wraps the generator in an MLE model
+    """
+    seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
+
+    x = generator(seq_input)
+
+    model = Model(seq_input, x)
     model.compile(
         optimizer='nadam',
         loss='categorical_crossentropy'
+    )
+
+    return model
+
+def pg(generator):
+    """
+    Wraps the generator in an policy gradient model
+    """
+    seq_input = Input(shape=(SEQ_LEN,), dtype='int32')
+    # Advantages for loss function
+    adv_input = Input(shape=(1,))
+
+    x = generator(seq_input)
+
+    model = Model([seq_input, adv_input], x)
+    model.compile(
+        optimizer='nadam',
+        loss=pg_loss(adv_input, chosen_input)
     )
 
     return model
