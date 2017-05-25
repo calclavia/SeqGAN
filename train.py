@@ -165,8 +165,8 @@ def main():
         running_rewards.append(avg_rewards)
         t.set_postfix(reward=np.mean(running_rewards))
 
-        # Recreate inputs by shifting output to the right
-        inputs = np.pad(outputs[:, 1:], ((0, 0), (1, 0)), 'constant')
+        # Recreate inputs by shifting output to the right and left pad by zero
+        inputs = np.pad(outputs[:, :-1], ((0, 0), (1, 0)), 'constant')
 
         # Convert outputs into one-hot version to use as target labels
         chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
@@ -178,6 +178,7 @@ def main():
         # TODO: Sample real data randomly = # of fake data
         # TODO: Train to classify fake and real data
         if e % 10 == 0:
+            # TODO: Should we save in the same path?
             generator.save_weights(RL_G_MODEL_PATH)
 
 if __name__ == '__main__':
