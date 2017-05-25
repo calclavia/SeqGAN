@@ -1,7 +1,7 @@
 from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, LambdaCallback
 
 from nltk.tokenize import sent_tokenize
 from tqdm import tqdm
@@ -78,6 +78,9 @@ def main():
     # Load embedding matrix
     embedding_matrix = load_embedding(tokenizer.word_index)
 
+    # Inverse word index
+    inv_idx = {v: k for k, v in tokenizer.word_index.items()}
+
     # Create models
     # TODO: Do model sharing later
     # base_model = create_base_model(embedding_matrix)
@@ -85,6 +88,7 @@ def main():
     discriminator = create_discriminator(create_base_model(embedding_matrix))
 
     os.makedirs('out', exist_ok=True)
+    os.makedirs('out/outputs', exist_ok=True)
 
     # Write word index to file for generation
     with open('out/word_index.json', 'w') as f:
@@ -99,15 +103,13 @@ def main():
         mle_generator.fit(
             train_data,
             target_data,
-            validation_split=0.1,
             epochs=1000,
             batch_size=BATCH_SIZE,
             callbacks=[
-                EarlyStopping(patience=5)
+                EarlyStopping(monitor='loss', patience=3),
+                LambdaCallback(on_epoch_end=lambda a, b: generator.save_weights(G_MODEL_PATH))
             ]
         )
-
-        generator.save_weights(G_MODEL_PATH)
     else:
         generator.load_weights(G_MODEL_PATH)
 
@@ -162,14 +164,10 @@ def main():
         # Normalize advantages
         avg_rewards = np.mean(rewards)
         # TODO: Should we discount the rewards?
-        advantages = rewards * 2 - 1
-        # TODO: Normalize rewards?
-        # std_rewards = np.std(rewards)
-        # (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
-
-        # Update progress bar
-        running_rewards.append(avg_rewards)
-        t.set_postfix(reward=np.mean(running_rewards))
+        # advantages = rewards * 2 - 1
+        # Normalize rewards
+        std_rewards = np.std(rewards)
+        advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
 
         # Recreate inputs by shifting output to the right and left pad by zero
         inputs = np.pad(outputs[:, :-1], ((0, 0), (1, 0)), 'constant')
@@ -181,18 +179,28 @@ def main():
         pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
-        # Create data samples. Fake, Real
-        # Randomly pick real data from training set
-        rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
-        d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
+        for k in range(10):
+            # Create data samples. Fake, Real
+            # Randomly pick real data from training set
+            rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
+            d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
 
-        # Train to classify fake and real data
-        discriminator.train_on_batch(d_train, d_targets)
+            # Train to classify fake and real data
+            d_metric = discriminator.train_on_batch(d_train, d_targets)
 
-        if e % 10 == 0:
+        # Update progress bar
+        running_rewards.append(avg_rewards)
+        t.set_postfix(
+            reward=np.mean(running_rewards),
+            d_loss=d_metric[0],
+            d_acc=d_metric[1]
+        )
+
+        if e % 32 == 0:
             # TODO: Should we save in the same path?
             generator.save_weights(RL_G_MODEL_PATH)
             discriminator.save_weights(RL_D_MODEL_PATH)
+            write_outputs(inv_idx, outputs, str(e))
 
 if __name__ == '__main__':
     main()

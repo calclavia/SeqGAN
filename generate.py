@@ -11,9 +11,10 @@ from constants import *
 from util import *
 import argparse
 
-def sample(distr, temp=1.0):
-    distr = np.log(distr) / temp
-    distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
+def sample(distr, temp=1):
+    if temp != 1:
+        distr = np.log(distr) / temp
+        distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
     return [np.random.choice(MAX_VOCAB, 1, p=distr[b])[0] for b in range(distr.shape[0])]
 
 def generate(generator, length=GEN_LEN, batch=1):
@@ -34,6 +35,16 @@ def generate(generator, length=GEN_LEN, batch=1):
     # Slice out the last words (Ignore the buffer)
     outputs = np.array(outputs)
     return outputs[:, -length:]
+
+def write_outputs(inv_idx, results, prefix=''):
+    for i, result in enumerate(results):
+        # Ignore null words
+        textual = [inv_idx[word] for word in result if word != 0]
+        joined_text = ' '.join(textual)
+
+        # Write result to file
+        with open('out/outputs/output_{}_{}.txt'.format(prefix, i), 'w') as f:
+            f.write(joined_text)
 
 def main():
     """
@@ -65,18 +76,8 @@ def main():
 
     results = generate(generator, args.gen_len, args.gen_count)
 
-    # Ignore null words
-    for i, result in enumerate(results):
-        textual = [inv_idx[word] for word in result if word != 0]
-
-        # Print resulting sentences
-        print('\nResulting Sentence, temp = ' + str(TEMP) + ':')
-        joined_text = ' '.join(textual)
-        print(joined_text)
-
-        # Write result to file
-        with open('out/output_{}.txt'.format(i), 'w') as f:
-            f.write(joined_text)
+    write_outputs(inv_idx, results)
+    print('Output written to file.')
 
 if __name__ == '__main__':
     main()
