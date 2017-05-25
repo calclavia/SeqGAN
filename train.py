@@ -147,6 +147,9 @@ def main():
     running_rewards = deque(maxlen=100)
     t = tqdm(range(10000))
 
+    # Targets for discriminator
+    d_targets = np.concatenate([np.zeros((ROLLOUT_BATCH,)), np.ones((ROLLOUT_BATCH,))])
+
     for e in t:
         ## Train generator
         # Perform rollouts
@@ -159,7 +162,10 @@ def main():
         # Normalize advantages
         avg_rewards = np.mean(rewards)
         # TODO: Should we discount the rewards?
-        advantages = (rewards - avg_rewards) / np.std(rewards)
+        advantages = rewards * 2 - 1
+        # TODO: Normalize rewards?
+        # std_rewards = np.std(rewards)
+        # (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
 
         # Update progress bar
         running_rewards.append(avg_rewards)
@@ -175,11 +181,18 @@ def main():
         pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
-        # TODO: Sample real data randomly = # of fake data
-        # TODO: Train to classify fake and real data
+        # Create data samples. Fake, Real
+        # Randomly pick real data from training set
+        rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
+        d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
+
+        # Train to classify fake and real data
+        discriminator.train_on_batch(d_train, d_targets)
+
         if e % 10 == 0:
             # TODO: Should we save in the same path?
             generator.save_weights(RL_G_MODEL_PATH)
+            discriminator.save_weights(RL_D_MODEL_PATH)
 
 if __name__ == '__main__':
     main()

@@ -9,7 +9,7 @@ TRAIN_WINDOW = 1
 FAKE_GEN_BATCH_SIZE = 2048
 NUM_FAKE = FAKE_GEN_BATCH_SIZE * 10
 BATCH_SIZE = 256
-ROLLOUT_BATCH = 128
+ROLLOUT_BATCH = 32
 
 # Generation Parameters
 TEMP = 1
@@ -20,3 +20,4 @@ G_MODEL_PATH = 'out/generator.h5'
 D_MODEL_PATH = 'out/discriminator.h5'
 
 RL_G_MODEL_PATH = 'out/generator_rl.h5'
+RL_D_MODEL_PATH = 'out/discriminator_rl.h5'
