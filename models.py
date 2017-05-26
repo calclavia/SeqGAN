@@ -65,7 +65,8 @@ def mle(generator):
     model = Model(seq_input, x)
     model.compile(
         optimizer='nadam',
-        loss='categorical_crossentropy'
+        loss='categorical_crossentropy',
+        metrics=['acc']
     )
 
     return model

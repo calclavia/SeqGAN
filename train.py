@@ -103,10 +103,11 @@ def main():
         mle_generator.fit(
             train_data,
             target_data,
-            epochs=1000,
+            validation_split=0.1,
+            epochs=100,
             batch_size=BATCH_SIZE,
             callbacks=[
-                EarlyStopping(monitor='loss', patience=3),
+                EarlyStopping(patience=3),
                 LambdaCallback(on_epoch_end=lambda a, b: generator.save_weights(G_MODEL_PATH))
             ]
         )
@@ -132,11 +133,11 @@ def main():
             d_train,
             d_targets,
             validation_split=0.1,
-            epochs=1000,
+            epochs=100,
             batch_size=BATCH_SIZE,
             callbacks=[
                 ModelCheckpoint(D_MODEL_PATH, save_best_only=True),
-                EarlyStopping(patience=5)
+                EarlyStopping(patience=3)
             ]
         )
     else:
@@ -179,13 +180,12 @@ def main():
         pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
-        for k in range(10):
-            # Create data samples. Fake, Real
-            # Randomly pick real data from training set
-            rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
-            d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
+        # Create data samples. Fake, Real
+        # Randomly pick real data from training set
+        rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
+        d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
 
-            # Train to classify fake and real data
+        for k in range(10):
             d_metric = discriminator.train_on_batch(d_train, d_targets)
 
         # Update progress bar
