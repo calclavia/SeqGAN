@@ -1,7 +1,7 @@
 # Model Parameters
 MAX_VOCAB = 1024
 EMBEDDING_DIM = 100
-NUM_UNITS = 256
+NUM_UNITS = 64
 
 # Training Parameters
 SEQ_LEN = 32
