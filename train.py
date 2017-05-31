@@ -43,6 +43,7 @@ def load_data(tokenizer):
     print('Number of sequences:', len(sequences))
     print('Average sequence length:', np.mean([len(seq) for seq in sequences]))
     print('Max sequence length:', max([len(seq) for seq in sequences]))
+    print('Min sequence length:', min([len(seq) for seq in sequences]))
     print('Found {} unique tokens.'.format(len(tokenizer.word_index)))
 
     # Create training data and target data.
@@ -179,14 +180,14 @@ def main():
         pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
-        for k in range(10):
-            # Create data samples. Fake, Real
-            # Randomly pick real data from training set
-            rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
-            d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
+        # for k in range(10):
+        # Create data samples. Fake, Real
+        # Randomly pick real data from training set
+        rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
+        d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
 
-            # Train to classify fake and real data
-            d_metric = discriminator.train_on_batch(d_train, d_targets)
+        # Train to classify fake and real data
+        d_metric = discriminator.train_on_batch(d_train, d_targets)
 
         # Update progress bar
         running_rewards.append(avg_rewards)
