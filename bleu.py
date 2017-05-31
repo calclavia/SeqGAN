@@ -1,8 +1,6 @@
 import numpy as np
 import nltk
 
-TEMP = .8
-
 def sample(distr, temp=1.0):
     distr = np.log(distr) / temp
     distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
@@ -40,7 +38,7 @@ def generate_mimic(generator, truth):
 
         distr = generator.predict(feed)
         distr = np.array(distr)
-        choice = sample(distr, temp=TEMP)
+        choice = sample(distr, temp=args.temperature)
         result = choices[0]
         results[i] = result
 
