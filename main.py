@@ -239,31 +239,18 @@ def test_bleu(args): #model,data_string,n=2):
     def toText (list_outputs):
         return [inv_idx[word] for word in list_outputs if word != 0]
 
-
     data_string = train_data[np.random.randint(len(train_data))]
-    reals = [toText(data_string)]
-    result = generate_mimic(model,reals[0])
-    fakes = [toText(result)]
+    reals = np.array([data_string])
 
-    score = nltk.translate.bleu_score.sentence_bleu(reals, fakes)
+    result = model.predict(reals)
+    distrs = np.array(result)
+    choices = [sample(distr, temp=args.temperature) for distr in distrs]
+    fake_text = ' '.join(toText(choices[0][1:-1]))
+    real_text = ' '.join(toText(data_string[1:-1]))
+
+    score = nltk.translate.bleu_score.sentence_bleu(real_text, fake_text)
     print ("Score is:" + str(score))
     
 
-def generate_mimic(generator, truth):
-    # Store results in results, but seed with truth
-    length = len(truth)
-    results = np.zeros(length)
-
-    for i in range(length):
-        # Take the last i of truth and feed it in.
-        feed = np.append([0 for x in range(0,length-i)],truth[:i])
-
-        distr = generator.predict(feed)
-        distr = np.array(distr)
-        choice = sample(distr, temp=args.temperature)
-        result = choices[0]
-        results[i] = result
-
-    return results
 if __name__ == '__main__':
     main()
