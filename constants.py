@@ -14,6 +14,8 @@ ROLLOUT_BATCH = 64
 # Generation Parameters
 TEMP = 1
 GEN_LEN = 64
+BLEU_SAMPLES = 500
+NGRAM = 4
 
 # Paths
 G_MODEL_PATH = 'out/generator.h5'
