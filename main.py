@@ -6,16 +6,43 @@ from keras.callbacks import ModelCheckpoint, EarlyStopping, LambdaCallback
 from nltk.tokenize import sent_tokenize
 from tqdm import tqdm
 
+import nltk
+import random
+import argparse
 import numpy as np
+import nltk
 import argparse
 import os
 import json
-from collections import deque
 
 from models import *
 from constants import *
 from util import *
-from generate import *
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--task',
+                        help='What to do?',
+                        choices=['train', 'generate', 'bleu',],
+                        required=True)
+    parser.add_argument('--temperature',
+                        help='Temperature for softmax sampling. [0,1]',
+                        type=int, default=.8, required=False)
+    parser.add_argument('--len', dest='gen_len', type=int, required=False, default=GEN_LEN)
+    parser.add_argument('--count', dest='gen_count', type=int, required=False, default=1)
+    parser.add_argument('--skip-gen-pretrain', dest='pretrain_gen',
+                        action='store_false', required=False)
+    parser.set_defaults(pretrain_gen=True)
+    args = parser.parse_args()
+
+    if (args.task == 'bleu'):
+        test_bleu(args)
+    elif (args.task == 'generate'):
+        generate(args)
+    else:
+        train(args)
+
 
 def load_data(tokenizer):
     """
@@ -60,18 +87,11 @@ def load_data(tokenizer):
     print('Shape of target_data tensor:', target_data.shape)
     return train_data, target_data
 
-def main():
+
+def train(args):
     """
     Main function executed to start training on dataset.
     """
-    parser = argparse.ArgumentParser(description='Trains the model.')
-    parser.add_argument('--skip-gen-pretrain', dest='pretrain_gen', action='store_false')
-    parser.add_argument('--skip-dis-pretrain', dest='pretrain_dis', action='store_false')
-    parser.set_defaults(pretrain_gen=True)
-    parser.set_defaults(pretrain_dis=True)
-
-    args = parser.parse_args()
-
     # Create tokenizer
     tokenizer = Tokenizer(num_words=MAX_VOCAB)
     # Load data
@@ -104,11 +124,10 @@ def main():
         mle_generator.fit(
             train_data,
             target_data,
-            validation_split=0.1,
-            epochs=100,
+            epochs=1000,
             batch_size=BATCH_SIZE,
             callbacks=[
-                EarlyStopping(patience=3),
+                EarlyStopping(monitor='loss', patience=3),
                 LambdaCallback(on_epoch_end=lambda a, b: generator.save_weights(G_MODEL_PATH))
             ]
         )
@@ -122,7 +141,7 @@ def main():
         # Generate fake samples
         num_real = train_data.shape[0]
         print('Generating {} fake samples...'.format(NUM_FAKE))
-        fake_batches = [generate(generator, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
+        fake_batches = [generate_seq(generator, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
         fake_samples = np.concatenate(fake_batches, axis=0)
 
         # Generate discriminator train and targets
@@ -134,11 +153,11 @@ def main():
             d_train,
             d_targets,
             validation_split=0.1,
-            epochs=100,
+            epochs=1000,
             batch_size=BATCH_SIZE,
             callbacks=[
                 ModelCheckpoint(D_MODEL_PATH, save_best_only=True),
-                EarlyStopping(patience=3)
+                EarlyStopping(patience=5)
             ]
         )
     else:
@@ -157,7 +176,7 @@ def main():
     for e in t:
         ## Train generator
         # Perform rollouts
-        outputs = generate(generator, SEQ_LEN, ROLLOUT_BATCH)
+        outputs = generate_seq(generator, SEQ_LEN, ROLLOUT_BATCH)
 
         # Compute advantages/rewards per rollout using D
         rewards = discriminator.predict(outputs)
@@ -181,6 +200,7 @@ def main():
         pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
+        # for k in range(10):
         # Create data samples. Fake, Real
         # Randomly pick real data from training set
         rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
@@ -202,6 +222,110 @@ def main():
             generator.save_weights(RL_G_MODEL_PATH)
             discriminator.save_weights(RL_D_MODEL_PATH)
             write_outputs(inv_idx, outputs, str(e))
+
+def sample(distr, temp=1):
+    if temp != 1:
+        distr = np.log(distr) / temp
+        distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
+    return [np.random.choice(MAX_VOCAB, 1, p=distr[b])[0] for b in range(distr.shape[0])]
+
+def generate_seq(generator, length=GEN_LEN, batch=1):
+    # Generative sampling
+    outputs = np.zeros((batch, SEQ_LEN))
+
+    for i in range(length):
+        # Take the last SEQ_LEN outputs and feed it in.
+        feed = outputs[:, -SEQ_LEN:]
+
+        distr = generator.predict(feed)
+        distr = np.array(distr)
+        # Pick the last result for each batch
+        distr = distr[:, -1]
+        choices = np.reshape(sample(distr, temp=TEMP), [-1, 1])
+        outputs = np.hstack([outputs, choices])
+
+    # Slice out the last words (Ignore the buffer)
+    outputs = np.array(outputs)
+    return outputs[:, -length:]
+
+def write_outputs(inv_idx, results, prefix=''):
+    for i, result in enumerate(results):
+        # Ignore null words
+        textual = [inv_idx[word] for word in result if word != 0]
+        joined_text = ' '.join(textual)
+
+        # Write result to file
+        with open('out/outputs/output_{}_{}.txt'.format(prefix, i), 'w') as f:
+            f.write(joined_text)
+
+def generate(args):
+    """
+    Main function executed to start training on dataset.
+    """
+    # Load word index
+    word_index = load_json_dict('out/word_index.json')
+
+    # Load embedding matrix
+    embedding_matrix = load_embedding(word_index)
+
+    # Create models
+    base_model = create_base_model(embedding_matrix)
+    generator = create_generator(base_model)
+
+    os.makedirs('out', exist_ok=True)
+
+    # Load in model weights
+    generator.load_weights(G_MODEL_PATH)
+
+    # Load word index
+    inv_idx = {v: k for k, v in word_index.items()}
+
+    results = generate_seq(generator, args.gen_len, args.gen_count)
+
+    write_outputs(inv_idx, results)
+    print('Output written to file.')
+
+
+
+def test_bleu(args):
+    """
+    Evaluates model's max activation outputs for a real sequence, by BLEU score.
+    model is generator, pass in trained
+    data_string is list of embedded tokens from real data... [23,244,12,70] etc
+    """
+    # Load data
+    tokenizer = Tokenizer(num_words=MAX_VOCAB)
+    train_data, target_data = load_data(tokenizer)
+    embedding_matrix = load_embedding(tokenizer.word_index)
+
+    # Load model
+    base_model = create_base_model(embedding_matrix)
+    model = create_generator(base_model)
+    model.load_weights(G_MODEL_PATH)
+
+    # Get word mapping for outputs -> text
+    word_index = load_json_dict('out/word_index.json')
+    inv_idx = {v: k for k, v in word_index.items()}
+
+    def toText (list_outputs):
+        return [inv_idx[word] for word in list_outputs if word != 0]
+
+    scores = []
+    for i in range(0,BLEU_SAMPLES):
+        data_string = train_data[np.random.randint(len(train_data))]
+        reals = np.array([data_string])
+
+        result = model.predict(reals)
+        distrs = np.array(result)
+        choices = [sample(distr, temp=args.temperature) for distr in distrs]
+        fake_text = ' '.join(toText(choices[0][1:-1]))
+        real_text = ' '.join(toText(data_string[1:-1]))
+
+        score = nltk.translate.bleu_score.sentence_bleu(real_text, fake_text)
+        scores.append(score)
+    avg_score = sum(scores) / float(len(scores))
+    print ("Score is:" + str(avg_score))
+    
 
 if __name__ == '__main__':
     main()

@@ -1,7 +1,7 @@
 # Model Parameters
 MAX_VOCAB = 1024
 EMBEDDING_DIM = 100
-NUM_UNITS = 256
+NUM_UNITS = 64
 
 # Training Parameters
 SEQ_LEN = 32
@@ -14,6 +14,8 @@ ROLLOUT_BATCH = 64
 # Generation Parameters
 TEMP = 1
 GEN_LEN = 64
+BLEU_SAMPLES = 500
+NGRAM = 4
 
 # Paths
 G_MODEL_PATH = 'out/generator.h5'
