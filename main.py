@@ -321,7 +321,7 @@ def test_bleu(args):
         fake_text = ' '.join(toText(choices[0][1:-1]))
         real_text = ' '.join(toText(data_string[1:-1]))
 
-        score = nltk.translate.bleu_score.sentence_bleu(real_text, fake_text, n=NGRAM)
+        score = nltk.translate.bleu_score.sentence_bleu(real_text, fake_text)
         scores.append(score)
     avg_score = sum(scores) / float(len(scores))
     print ("Score is:" + str(avg_score))
