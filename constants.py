@@ -4,6 +4,7 @@ EMBEDDING_DIM = 100
 NUM_UNITS = 64
 
 # Training Parameters
+G = 10
 SEQ_LEN = 32
 TRAIN_WINDOW = 1
 FAKE_GEN_BATCH_SIZE = 2048
@@ -14,7 +15,7 @@ ROLLOUT_BATCH = 64
 # Generation Parameters
 TEMP = 1
 GEN_LEN = 64
-BLEU_SAMPLES = 500
+BLEU_SAMPLES = 10
 NGRAM = 4
 
 # Paths

@@ -31,8 +31,8 @@ def main():
                         type=int, default=.8, required=False)
     parser.add_argument('--len', dest='gen_len', type=int, required=False, default=GEN_LEN)
     parser.add_argument('--count', dest='gen_count', type=int, required=False, default=1)
-    parser.add_argument('--skip-gen-pretrain', dest='pretrain_gen',
-                        action='store_false', required=False)
+    parser.add_argument('--skip-gen-pretrain', dest='pretrain_gen', action='store_false', required=False)
+    parser.add_argument('--skip-dis-pretrain', dest='pretrain_dis', action='store_false', required=False)
     parser.set_defaults(pretrain_gen=True)
     args = parser.parse_args()
 
@@ -175,29 +175,31 @@ def train(args):
 
     for e in t:
         ## Train generator
-        # Perform rollouts
-        outputs = generate_seq(generator, SEQ_LEN, ROLLOUT_BATCH)
+        for g in range(0,G):
+            # Perform rollouts
+            outputs = generate_seq(generator, SEQ_LEN, ROLLOUT_BATCH)
 
-        # Compute advantages/rewards per rollout using D
-        rewards = discriminator.predict(outputs)
+            # Compute advantages/rewards per rollout using D
+            rewards = discriminator.predict(outputs)
 
-        # Advantages has shape (batch, 1)
-        # Normalize advantages
-        avg_rewards = np.mean(rewards)
-        # TODO: Should we discount the rewards?
-        # advantages = rewards * 2 - 1
-        # Normalize rewards
-        std_rewards = np.std(rewards)
-        advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
+            # Advantages has shape (batch, 1)
+            # Normalize advantages
+            avg_rewards = np.mean(rewards)
+            # TODO: Should we discount the rewards?
+            # advantages = rewards * 2 - 1
+            # Normalize rewards
+            std_rewards = np.std(rewards)
+            advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
 
-        # Recreate inputs by shifting output to the right and left pad by zero
-        inputs = np.pad(outputs[:, :-1], ((0, 0), (1, 0)), 'constant')
+            # Recreate inputs by shifting output to the right and left pad by zero
+            inputs = np.pad(outputs[:, :-1], ((0, 0), (1, 0)), 'constant')
 
-        # Convert outputs into one-hot version to use as target labels
-        chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
+            # Convert outputs into one-hot version to use as target labels
+            chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
+            print (outputs)
 
-        # Perform gradient updates
-        pg_generator.train_on_batch([inputs, advantages], chosen)
+            # Perform gradient updates
+            pg_generator.train_on_batch([inputs, advantages], chosen)
 
         ## Train discriminator
         # for k in range(10):
@@ -301,7 +303,7 @@ def test_bleu(args):
     # Load model
     base_model = create_base_model(embedding_matrix)
     model = create_generator(base_model)
-    model.load_weights(G_MODEL_PATH)
+    #model.load_weights(G_MODEL_PATH)
 
     # Get word mapping for outputs -> text
     word_index = load_json_dict('out/word_index.json')
@@ -310,19 +312,22 @@ def test_bleu(args):
     def toText (list_outputs):
         return [inv_idx[word] for word in list_outputs if word != 0]
 
+    # Get body of fakes (hypotheses) and reals.. the actual test corpus
+    # SeqGan paper checks against (whole test set) - test against 20%
+    fifth = int(train_data.shape[0]/5)
+    reals = train_data[:fifth,:]
+    fakes = generate_seq(model, length=GEN_LEN, batch=BLEU_SAMPLES)
+
+    # Convert to text for BLEU scoring
+    fakes_text = [' '.join(toText(fake)) for fake in fakes]
+    reals_text = [' '.join(toText(real)) for real in reals]
+
+    # 4-gram BLEU score
     scores = []
-    for i in range(0,BLEU_SAMPLES):
-        data_string = train_data[np.random.randint(len(train_data))]
-        reals = np.array([data_string])
-
-        result = model.predict(reals)
-        distrs = np.array(result)
-        choices = [sample(distr, temp=args.temperature) for distr in distrs]
-        fake_text = ' '.join(toText(choices[0][1:-1]))
-        real_text = ' '.join(toText(data_string[1:-1]))
-
-        score = nltk.translate.bleu_score.sentence_bleu(real_text, fake_text)
+    for fake_sample in fakes_text:
+        score = nltk.translate.bleu_score.sentence_bleu(reals_text, fake_sample, weights=[.25,.25,.25,.25])
         scores.append(score)
+
     avg_score = sum(scores) / float(len(scores))
     print ("Score is:" + str(avg_score))
     
