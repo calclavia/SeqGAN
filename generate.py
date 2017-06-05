@@ -28,7 +28,6 @@ def generate(generator, length=GEN_LEN, batch=1):
         distr = generator.predict(feed)
         distr = np.array(distr)
         # Pick the last result for each batch
-        distr = distr[:, -1]
         choices = np.reshape(sample(distr, temp=TEMP), [-1, 1])
         outputs = np.hstack([outputs, choices])
 
@@ -39,12 +38,15 @@ def generate(generator, length=GEN_LEN, batch=1):
 def write_outputs(inv_idx, results, prefix=''):
     for i, result in enumerate(results):
         # Ignore null words
-        textual = [inv_idx[word] for word in result if word != 0]
+        textual = to_text(result, inv_idx)
         joined_text = ' '.join(textual)
 
         # Write result to file
         with open('out/outputs/output_{}_{}.txt'.format(prefix, i), 'w') as f:
             f.write(joined_text)
+
+def to_text(tokens, inv_idx):
+    return [inv_idx[word] for word in tokens if word != 0]
 
 def main():
     """

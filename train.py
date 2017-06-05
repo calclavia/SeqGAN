@@ -50,11 +50,12 @@ def load_data(tokenizer):
     # Truncates and pads sequences so that they're the same length.
     train_data = pad_sequences([x[:-1] for x in sequences], maxlen=SEQ_LEN)
     # Target data is training data shfited by one word
-    target_data = pad_sequences([x[1:] for x in sequences], maxlen=SEQ_LEN)
+    target_data = [x[-1] for x in sequences]
     # TODO: Vocab size seems to be a limits outputs
 
     # Convert to one-hot vector
     target_data = np.array([to_categorical(seq, MAX_VOCAB) for seq in target_data])
+    target_data = np.squeeze(target_data)
 
     print('Shape of train_data tensor:', train_data.shape)
     print('Shape of target_data tensor:', target_data.shape)
@@ -151,16 +152,19 @@ def main():
     running_rewards = deque(maxlen=100)
     t = tqdm(range(10000))
 
-    # Targets for discriminator
+    # Targets for discriminator (fake, real)
     d_targets = np.concatenate([np.zeros((ROLLOUT_BATCH,)), np.ones((ROLLOUT_BATCH,))])
-
+    real_samp = train_data[0, :]
+    print(to_text(real_samp, inv_idx))
     for e in t:
         ## Train generator
         # Perform rollouts
         outputs = generate(generator, SEQ_LEN, ROLLOUT_BATCH)
 
         # Compute advantages/rewards per rollout using D
-        rewards = discriminator.predict(outputs)
+        # rewards = discriminator.predict(outputs)
+        # rewards = [sum([1 if oo == real_samp[i] else 0 for i, oo in enumerate(o)]) for o in outputs]
+        rewards = [list(o).count(1) for o in outputs]
 
         # Advantages has shape (batch, 1)
         # Normalize advantages
@@ -172,22 +176,37 @@ def main():
         advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
 
         # Recreate inputs by shifting output to the right and left pad by zero
-        inputs = np.pad(outputs[:, :-1], ((0, 0), (1, 0)), 'constant')
+        inputs = np.pad(outputs[:, :-1], ((0, 0), (SEQ_LEN, 0)), 'constant')
 
-        # Convert outputs into one-hot version to use as target labels
-        chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
+        g_train = []
+        g_adv = []
+
+        # Chop out input windows
+        for i in range(SEQ_LEN):
+            g_train.append(inputs[:, i:i + SEQ_LEN])
+            g_adv.append(advantages)
+
+        g_train = np.concatenate(g_train, axis=0)
+        g_chosen = np.reshape(outputs, [-1])
+        g_chosen = to_categorical(g_chosen, MAX_VOCAB)
+        g_adv = np.concatenate(g_adv, axis=0)
 
         # Perform gradient updates
-        pg_generator.train_on_batch([inputs, advantages], chosen)
+        pg_generator.train_on_batch([g_train, g_adv], g_chosen)
 
         ## Train discriminator
         # Create data samples. Fake, Real
         # Randomly pick real data from training set
-        rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
-        d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
+        """
+        # rand_ids = np.random.randint(train_data.shape[0], size=ROLLOUT_BATCH)
+        rand_ids = [0 for i in range(ROLLOUT_BATCH)]
+        real = train_data[rand_ids, :]
+        d_train = np.concatenate([outputs, real], axis=0)
 
         # Train to classify fake and real data
         d_metric = discriminator.train_on_batch(d_train, d_targets)
+        """
+        d_metric = [0, 0]
 
         # Update progress bar
         running_rewards.append(avg_rewards)
@@ -197,11 +216,16 @@ def main():
             d_acc=d_metric[1]
         )
 
-        if e % 32 == 0:
+        if e % 50 == 0:
             # TODO: Should we save in the same path?
             generator.save_weights(RL_G_MODEL_PATH)
             discriminator.save_weights(RL_D_MODEL_PATH)
             write_outputs(inv_idx, outputs, str(e))
+
+            # real_re = discriminator.predict(real)
+            print(rewards)
+            # print(real_re)
+            # print([[1 if oo == real_samp[i] else 0 for i, oo in enumerate(o)] for o in outputs])
 
 if __name__ == '__main__':
     main()
