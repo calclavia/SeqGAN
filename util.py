@@ -4,6 +4,15 @@ import json
 from constants import *
 from tqdm import tqdm
 
+def discount_rewards(r, gamma=0.99):
+    """ Take 1D float array of rewards and compute discounted reward """
+    discounted_r = np.zeros_like(r)
+    running_add = 0
+    for t in reversed(range(0, len(r))):
+        running_add = running_add * gamma + r[t]
+        discounted_r[t] = running_add
+    return discounted_r
+
 def load_corpus():
     """
     Loads the dataset and returns a list of sequence.

@@ -2,6 +2,7 @@ from keras.preprocessing.text import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 from keras.utils import to_categorical
 from keras.callbacks import ModelCheckpoint
+
 import random
 import numpy as np
 import os

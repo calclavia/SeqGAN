@@ -114,7 +114,8 @@ def main():
             ]
         )
     else:
-        generator.load_weights(G_MODEL_PATH)
+        pass
+        # generator.load_weights(G_MODEL_PATH)
 
     if args.pretrain_dis:
         # TODO: This is sort of redundant, since the GAN part should already be training discriminator. Modulate this.
@@ -161,24 +162,27 @@ def main():
         # Perform rollouts
         outputs, inputs = generate(generator, SEQ_LEN, ROLLOUT_BATCH)
 
-        # Compute advantages/rewards per rollout using D
+        # Compute advantage/rewards per rollout using D
         # rewards = discriminator.predict(outputs)
-        # rewards = [sum([1 if oo == real_samp[i] else 0 for i, oo in enumerate(o)]) for o in outputs]
-        rewards = [list(o).count(1) for o in outputs]
+        rewards = [sum([1 if oo == real_samp[i] else 0 for i, oo in enumerate(o)]) for o in outputs]
+        # rewards = np.array([list(o).count(1) for o in outputs]).astype(float)
 
         # Advantages has shape (batch, 1)
         # Normalize rewards for calculating advantage
-        advantages = rewards
-        advantages -= np.mean(advantages)
-        advantages /= np.std(advantages)
+        # Rescale rewards
+        adv = rewards
+        adv = [[0] * (SEQ_LEN - 1) + [r] for r in adv]
+        adv = [discount_rewards(a) for a in adv]
+        # adv -= np.mean(adv)
+        # adv /= np.std(adv)
 
-        g_train = np.reshape(inputs, [-1, SEQ_LEN])
+        g_inputs = np.reshape(inputs, [-1, SEQ_LEN])
         g_chosen = np.reshape(outputs, [-1, 1])
         g_chosen = to_categorical(g_chosen, MAX_VOCAB)
-        g_adv = np.tile(advantages, outputs.shape[1])
+        g_adv = np.reshape(adv, [-1, 1])
 
         # Perform gradient updates
-        pg_generator.train_on_batch([g_train, g_adv], g_chosen)
+        pg_generator.train_on_batch([g_inputs, g_adv], g_chosen)
 
         ## Train discriminator
         # Create data samples. Fake, Real

@@ -1,6 +1,7 @@
 from keras.models import Model
 from keras.layers import *
 from keras import backend as K
+from keras import regularizers as reg
 
 from constants import *
 
@@ -12,7 +13,9 @@ def pg_loss(advantage):
         # L = \sum{A * log(p(y | x))}
         # Mask out probability of action taken
         responsible_outputs = K.sum(y_true * y_pred, axis=1)
-        return -K.sum(advantage * K.log(responsible_outputs))
+        policy_loss = -K.sum(advantage * K.log(responsible_outputs))
+        entropy_loss = -K.sum(y_pred * K.log(y_pred))
+        return policy_loss - 0.01 * entropy_loss
     return f
 
 def create_base_model(embedding_matrix):
@@ -32,7 +35,7 @@ def create_base_model(embedding_matrix):
     # x = Dropout(0.2)(x)
 
     # LSTM with dropout
-    x = LSTM(NUM_UNITS, return_sequences=True)(x)
+    x = LSTM(NUM_UNITS, return_sequences=True, kernel_regularizer=reg.l2(0.01))(x)
     # x = Dropout(0.5)(x)
 
     return Model(seq_input, x)
@@ -45,7 +48,7 @@ def create_generator(base_model):
 
     x = base_model(seq_input)
 
-    x = LSTM(NUM_UNITS)(x)#, return_sequences=True)(x)
+    x = LSTM(NUM_UNITS, kernel_regularizer=reg.l2(0.01))(x)
     # x = Dropout(0.5)(x)
 
     # Prediction (probability)
