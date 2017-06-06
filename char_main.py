@@ -15,7 +15,8 @@ import argparse
 import os
 import json
 
-from models import *
+from collections import deque
+from char_models import *
 from constants import *
 from util import *
 
@@ -44,82 +45,74 @@ def main():
         train(args)
 
 
-def load_data(tokenizer):
+def load_data():
     """
     Loads training data from file and processes it.
     """
     print('Loading data...')
     # Prepare the tokenizer
     text = load_corpus()
+    text = text.lower()
+    text = list(text)
 
-    # Split based on sentences
-    sentences = sent_tokenize(text)
+    # Find unique chars, create mapping
+    charset = set(text)
+    chardict = {}
+    for x in range(0,len(charset)):
+        chardict[x] = list(charset)[x]
+    invdict = {v:k for (k,v) in chardict.items()}
 
-    tokenizer.fit_on_texts(sentences)
-
-    # A list of sequences. Each sequence has a different length.
-    sentences = tokenizer.texts_to_sequences(sentences)
-
+    # Slice data into SEQ_LEN sequences of chars
     sequences = []
-
-    # Slice long sentences into subsequences of SEQ_LEN
-    for sent in sentences:
-        for i in range(0, len(sent) - SEQ_LEN + 1, TRAIN_WINDOW):
-            sequences.append(sent[i: i + SEQ_LEN])
+    for seq in range(0,int(len(text)/(SEQ_LEN+1))):
+            sequences.append(text[seq*(SEQ_LEN+1):(seq+1)*(SEQ_LEN+1)])
 
     print('Number of sequences:', len(sequences))
     print('Average sequence length:', np.mean([len(seq) for seq in sequences]))
     print('Max sequence length:', max([len(seq) for seq in sequences]))
     print('Min sequence length:', min([len(seq) for seq in sequences]))
-    print('Found {} unique tokens.'.format(len(tokenizer.word_index)))
+    print('Found {} unique tokens.'.format(len(charset)))
 
     # Create training data and target data.
-    # Truncates and pads sequences so that they're the same length.
-    train_data = pad_sequences([x[:-1] for x in sequences], maxlen=SEQ_LEN)
-    # Target data is training data shfited by one word
-    target_data = pad_sequences([x[1:] for x in sequences], maxlen=SEQ_LEN)
-    # TODO: Vocab size seems to be a limits outputs
+    # First, map to numbers 
+    train_data = [[invdict[c] for c in seq] for seq in [x[:-1] for x in sequences]]
+    target_data = [[invdict[c] for c in seq] for seq in [x[1:] for x in sequences]]
 
     # Convert to one-hot vector
-    target_data = np.array([to_categorical(seq, MAX_VOCAB) for seq in target_data])
+    num_chars = len(charset)
+    target_data = np.array([to_categorical(seq, num_chars) for seq in target_data])
+    train_data = np.array([to_categorical(seq, num_chars) for seq in train_data])
 
     print('Shape of train_data tensor:', train_data.shape)
     print('Shape of target_data tensor:', target_data.shape)
-    return train_data, target_data
+
+    # Save char map info
+    info = (num_chars,invdict)
+    np.save('char_maps',info)
+    return train_data, target_data, invdict, num_chars
 
 
 def train(args):
     """
     Main function executed to start training on dataset.
     """
-    # Create tokenizer
-    tokenizer = Tokenizer(num_words=MAX_VOCAB)
     # Load data
-    train_data, target_data = load_data(tokenizer)
-    # Load embedding matrix
-    embedding_matrix = load_embedding(tokenizer.word_index)
-
-    # Inverse word index
-    inv_idx = {v: k for k, v in tokenizer.word_index.items()}
+    train_data, target_data, inv_idx, num_chars = load_data()
 
     # Create models
     # TODO: Do model sharing later
     # base_model = create_base_model(embedding_matrix)
-    generator = create_generator(create_base_model(embedding_matrix))
-    discriminator = create_discriminator(create_base_model(embedding_matrix))
+    generator = create_generator(create_base_model(num_chars), num_chars)
+    discriminator = create_discriminator(create_base_model(num_chars), num_chars)
 
     os.makedirs('out', exist_ok=True)
     os.makedirs('out/outputs', exist_ok=True)
-
-    # Write word index to file for generation
-    with open('out/word_index.json', 'w') as f:
-        json.dump(tokenizer.word_index, f)
 
     # MLE Pre-training
     if args.pretrain_gen:
         print('Pre-training generator...')
         # Wrap the generator with MLE loss
-        mle_generator = mle(generator)
+        mle_generator = mle(generator, num_chars)
 
         mle_generator.fit(
             train_data,
@@ -141,7 +134,7 @@ def train(args):
         # Generate fake samples
         num_real = train_data.shape[0]
         print('Generating {} fake samples...'.format(NUM_FAKE))
-        fake_batches = [generate_seq(generator, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
+        fake_batches = [generate_seq(generator, num_chars, SEQ_LEN, batch=FAKE_GEN_BATCH_SIZE) for i in tqdm(range(NUM_FAKE // FAKE_GEN_BATCH_SIZE))]
         fake_samples = np.concatenate(fake_batches, axis=0)
 
         # Generate discriminator train and targets
@@ -165,7 +158,7 @@ def train(args):
 
     # GAN Training
     print('GAN training...')
-    pg_generator = pg(generator)
+    pg_generator = pg(generator, num_chars)
 
     running_rewards = deque(maxlen=100)
     t = tqdm(range(10000))
@@ -177,7 +170,9 @@ def train(args):
         ## Train generator
         for g in range(0,G):
             # Perform rollouts
-            outputs = generate_seq(generator, SEQ_LEN, ROLLOUT_BATCH)
+            full_outputs = generate_seq(generator, num_chars, SEQ_LEN+1, ROLLOUT_BATCH)
+            outputs = full_outputs[:,1:]
+            inputs = full_outputs[:,:-1]
 
             # Compute advantages/rewards per rollout using D
             rewards = discriminator.predict(outputs)
@@ -191,12 +186,9 @@ def train(args):
             std_rewards = np.std(rewards)
             advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
 
-            # Recreate inputs by shifting output to the right and left pad by zero
-            inputs = np.pad(outputs[:, :-1], ((0, 0), (1, 0)), 'constant')
-
             # Convert outputs into one-hot version to use as target labels
-            chosen = np.array([to_categorical(o, MAX_VOCAB) for o in outputs])
-            print (outputs)
+            #chosen = np.array([to_categorical(o, num_chars) for o in outputs])
+            chosen = outputs
 
             # Perform gradient updates
             pg_generator.train_on_batch([inputs, advantages], chosen)
@@ -225,25 +217,26 @@ def train(args):
             discriminator.save_weights(RL_D_MODEL_PATH)
             write_outputs(inv_idx, outputs, str(e))
 
-def sample(distr, temp=1):
+def sample(distr, num_chars, temp=1):
     if temp != 1:
         distr = np.log(distr) / temp
         distr = np.exp(distr) / np.sum(np.exp(distr), axis=1)[:, None]
-    return [np.random.choice(MAX_VOCAB, 1, p=distr[b])[0] for b in range(distr.shape[0])]
+    return [np.random.choice(num_chars, 1, p=distr[b])[0] for b in range(distr.shape[0])]
 
-def generate_seq(generator, length=GEN_LEN, batch=1):
+def generate_seq(generator, char_n, length=GEN_LEN, batch=1):
     # Generative sampling
-    outputs = np.zeros((batch, SEQ_LEN))
+    outputs = np.zeros((batch, SEQ_LEN, char_n))
 
     for i in range(length):
         # Take the last SEQ_LEN outputs and feed it in.
-        feed = outputs[:, -SEQ_LEN:]
+        feed = outputs[:, -SEQ_LEN:,:]
 
         distr = generator.predict(feed)
         distr = np.array(distr)
         # Pick the last result for each batch
         distr = distr[:, -1]
-        choices = np.reshape(sample(distr, temp=TEMP), [-1, 1])
+        choices = np.reshape(sample(distr, char_n, temp=TEMP), [-1, 1])
+        choices = np.array([to_categorical(choice, char_n) for choice in choices]) 
         outputs = np.hstack([outputs, choices])
 
     # Slice out the last words (Ignore the buffer)
@@ -253,8 +246,10 @@ def generate_seq(generator, length=GEN_LEN, batch=1):
 def write_outputs(inv_idx, results, prefix=''):
     for i, result in enumerate(results):
         # Ignore null words
-        textual = [inv_idx[word] for word in result if word != 0]
-        joined_text = ' '.join(textual)
+        result = result.argmax(axis=1)
+        num_to_char = {v:k for (k,v) in inv_idx.items()}
+        textual = [num_to_char[c] for c in result]
+        joined_text = ''.join(textual)
 
         # Write result to file
         with open('out/outputs/output_{}_{}.txt'.format(prefix, i), 'w') as f:
@@ -264,25 +259,21 @@ def generate(args):
     """
     Main function executed to start training on dataset.
     """
-    # Load word index
-    word_index = load_json_dict('out/word_index.json')
-
-    # Load embedding matrix
-    embedding_matrix = load_embedding(word_index)
+    # Load data info
+    info = np.load('char_maps.npy')
+    num_chars = info[0]
+    inv_idx = info[1]
 
     # Create models
-    base_model = create_base_model(embedding_matrix)
-    generator = create_generator(base_model)
+    base_model = create_base_model(num_chars)
+    generator = create_generator(base_model, num_chars)
 
     os.makedirs('out', exist_ok=True)
 
     # Load in model weights
     generator.load_weights(G_MODEL_PATH)
 
-    # Load word index
-    inv_idx = {v: k for k, v in word_index.items()}
-
-    results = generate_seq(generator, args.gen_len, args.gen_count)
+    results = generate_seq(generator, num_chars, args.gen_len, args.gen_count)
 
     write_outputs(inv_idx, results)
     print('Output written to file.')
@@ -296,13 +287,13 @@ def test_bleu(args):
     data_string is list of embedded tokens from real data... [23,244,12,70] etc
     """
     # Load data
-    tokenizer = Tokenizer(num_words=MAX_VOCAB)
-    train_data, target_data = load_data(tokenizer)
+    tokenizer = Tokenizer(num_words=num_chars)
+    train_data, target_data, inv_idx, num_chars = load_data()
     embedding_matrix = load_embedding(tokenizer.word_index)
 
     # Load model
-    base_model = create_base_model(embedding_matrix)
-    model = create_generator(base_model)
+    base_model = create_base_model(num_chars)
+    model = create_generator(base_model, num_chars)
     #model.load_weights(G_MODEL_PATH)
 
     # Get word mapping for outputs -> text
@@ -316,7 +307,7 @@ def test_bleu(args):
     # SeqGan paper checks against (whole test set) - test against 20%
     fifth = int(train_data.shape[0]/5)
     reals = train_data[:fifth,:]
-    fakes = generate_seq(model, length=GEN_LEN, batch=BLEU_SAMPLES)
+    fakes = generate_seq(model, num_chars, length=GEN_LEN, batch=BLEU_SAMPLES)
 
     # Convert to text for BLEU scoring
     fakes_text = [' '.join(toText(fake)) for fake in fakes]
