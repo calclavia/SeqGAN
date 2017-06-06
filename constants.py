@@ -4,7 +4,7 @@ EMBEDDING_DIM = 100
 NUM_UNITS = 64
 
 # Training Parameters
-G = 10
+G = 2
 SEQ_LEN = 32
 TRAIN_WINDOW = 1
 FAKE_GEN_BATCH_SIZE = 2048
