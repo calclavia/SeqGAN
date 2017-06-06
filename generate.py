@@ -20,6 +20,7 @@ def sample(distr, temp=1):
 def generate(generator, length=GEN_LEN, batch=1):
     # Generative sampling
     outputs = np.zeros((batch, SEQ_LEN))
+    inputs = []
 
     for i in range(length):
         # Take the last SEQ_LEN outputs and feed it in.
@@ -27,13 +28,15 @@ def generate(generator, length=GEN_LEN, batch=1):
 
         distr = generator.predict(feed)
         distr = np.array(distr)
-        # Pick the last result for each batch
         choices = np.reshape(sample(distr, temp=TEMP), [-1, 1])
         outputs = np.hstack([outputs, choices])
 
-    # Slice out the last words (Ignore the buffer)
+        inputs.append(feed)
+
+    inputs = np.array(inputs)
     outputs = np.array(outputs)
-    return outputs[:, -length:]
+    # Slice out the last words (Ignore the buffer)
+    return outputs[:, -length:], inputs
 
 def write_outputs(inv_idx, results, prefix=''):
     for i, result in enumerate(results):
@@ -76,7 +79,7 @@ def main():
     # Load word index
     inv_idx = {v: k for k, v in word_index.items()}
 
-    results = generate(generator, args.gen_len, args.gen_count)
+    results = generate(generator, args.gen_len, args.gen_count)[0]
 
     write_outputs(inv_idx, results)
     print('Output written to file.')

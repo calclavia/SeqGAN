@@ -159,7 +159,7 @@ def main():
     for e in t:
         ## Train generator
         # Perform rollouts
-        outputs = generate(generator, SEQ_LEN, ROLLOUT_BATCH)
+        outputs, inputs = generate(generator, SEQ_LEN, ROLLOUT_BATCH)
 
         # Compute advantages/rewards per rollout using D
         # rewards = discriminator.predict(outputs)
@@ -167,29 +167,15 @@ def main():
         rewards = [list(o).count(1) for o in outputs]
 
         # Advantages has shape (batch, 1)
-        # Normalize advantages
-        avg_rewards = np.mean(rewards)
-        # TODO: Should we discount the rewards?
-        # advantages = rewards * 2 - 1
-        # Normalize rewards
-        std_rewards = np.std(rewards)
-        advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
+        # Normalize rewards for calculating advantage
+        advantages = rewards
+        advantages -= np.mean(advantages)
+        advantages /= np.std(advantages)
 
-        # Recreate inputs by shifting output to the right and left pad by zero
-        inputs = np.pad(outputs[:, :-1], ((0, 0), (SEQ_LEN, 0)), 'constant')
-
-        g_train = []
-        g_adv = []
-
-        # Chop out input windows
-        for i in range(SEQ_LEN):
-            g_train.append(inputs[:, i:i + SEQ_LEN])
-            g_adv.append(advantages)
-
-        g_train = np.concatenate(g_train, axis=0)
-        g_chosen = np.reshape(outputs, [-1])
+        g_train = np.reshape(inputs, [-1, SEQ_LEN])
+        g_chosen = np.reshape(outputs, [-1, 1])
         g_chosen = to_categorical(g_chosen, MAX_VOCAB)
-        g_adv = np.concatenate(g_adv, axis=0)
+        g_adv = np.tile(advantages, outputs.shape[1])
 
         # Perform gradient updates
         pg_generator.train_on_batch([g_train, g_adv], g_chosen)
@@ -209,7 +195,8 @@ def main():
         d_metric = [0, 0]
 
         # Update progress bar
-        running_rewards.append(avg_rewards)
+        running_rewards.append(np.mean(rewards))
+
         t.set_postfix(
             reward=np.mean(running_rewards),
             d_loss=d_metric[0],
@@ -223,7 +210,7 @@ def main():
             write_outputs(inv_idx, outputs, str(e))
 
             # real_re = discriminator.predict(real)
-            print(rewards)
+            # print(rewards)
             # print(real_re)
             # print([[1 if oo == real_samp[i] else 0 for i, oo in enumerate(o)] for o in outputs])
 

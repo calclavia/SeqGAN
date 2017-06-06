@@ -9,7 +9,8 @@ def pg_loss(advantage):
         """
         Policy gradient loss
         """
-        # L = \sum{A * log(p)}
+        # L = \sum{A * log(p(y | x))}
+        # Mask out probability of action taken
         responsible_outputs = K.sum(y_true * y_pred, axis=1)
         return -K.sum(advantage * K.log(responsible_outputs))
     return f
