@@ -8,6 +8,13 @@ from rollout import ROLLOUT
 from target_lstm import TARGET_LSTM
 import pickle
 
+from nltk.tokenize import sent_tokenize
+from keras.preprocessing.text import Tokenizer
+import os
+import json
+
+vocab_size = 5000
+
 #########################################################################################
 #  Generator  Hyper-parameters
 ######################################################################################
@@ -35,7 +42,6 @@ dis_batch_size = 64
 TOTAL_BATCH = 800
 positive_file = 'save/real_data.txt'
 negative_file = 'save/generator_sample.txt'
-eval_file = 'save/eval_file.txt'
 generated_num = 10000
 
 
@@ -64,7 +70,6 @@ def target_loss(sess, target_lstm, data_loader):
 
     return np.mean(nll)
 
-
 def pre_train_epoch(sess, trainable_model, data_loader):
     # Pre-train the generator using MLE for one epoch
     supervised_g_losses = []
@@ -77,6 +82,57 @@ def pre_train_epoch(sess, trainable_model, data_loader):
 
     return np.mean(supervised_g_losses)
 
+def load_corpus():
+    """
+    Loads the dataset and returns a list of sequence.
+    """
+    fpath = 'data/obama.txt'
+    with open(fpath, encoding='utf-8') as f:
+        text = f.read()
+    return text
+
+def create_real_file(output_file):
+    """
+    Loads training data from file and processes it.
+    """
+    print('Loading data...')
+    # Create tokenizer
+    tokenizer = Tokenizer(num_words=vocab_size)
+
+    # Prepare the tokenizer
+    text = load_corpus()
+
+    # Split based on sentences
+    sentences = sent_tokenize(text)
+
+    tokenizer.fit_on_texts(sentences)
+
+    # A list of sequences. Each sequence has a different length.
+    sentences = tokenizer.texts_to_sequences(sentences)
+
+    sequences = []
+
+    # Slice long sentences into subsequences of SEQ_LEN
+    for sent in sentences:
+        for i in range(0, len(sent) - SEQ_LENGTH + 1, 3):
+            sequences.append(sent[i: i + SEQ_LENGTH])
+
+    print('Number of sequences:', len(sequences))
+    print('Average sequence length:', np.mean([len(seq) for seq in sequences]))
+    print('Max sequence length:', max([len(seq) for seq in sequences]))
+    print('Min sequence length:', min([len(seq) for seq in sequences]))
+    print('Found {} unique tokens.'.format(len(tokenizer.word_index)))
+
+    with open(positive_file, 'w') as f:
+        for seq in sequences:
+            buf = ' '.join([str(x) for x in seq]) + '\n'
+            f.write(buf)
+
+    os.makedirs('out', exist_ok=True)
+
+    # Write word index to file for generation
+    with open('out/word_index.json', 'w') as f:
+        json.dump(tokenizer.word_index, f)
 
 def main():
     random.seed(SEED)
@@ -85,12 +141,11 @@ def main():
 
     gen_data_loader = Gen_Data_loader(BATCH_SIZE)
     likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
-    vocab_size = 5000
     dis_data_loader = Dis_dataloader(BATCH_SIZE)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
-    target_params = pickle.load(open('save/target_params.pkl', 'rb'))
-    target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
+    # target_params = pickle.load(open('save/target_params.pkl', 'rb'))
+    # target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
 
     discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim,
                                 filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
@@ -101,7 +156,8 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
-    generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
+    # generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
+    create_real_file(positive_file)
     gen_data_loader.create_batches(positive_file)
 
     log = open('save/experiment-log.txt', 'w')
@@ -111,9 +167,10 @@ def main():
     for epoch in range(PRE_EPOCH_NUM):
         loss = pre_train_epoch(sess, generator, gen_data_loader)
         if epoch % 5 == 0:
-            generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
-            likelihood_data_loader.create_batches(eval_file)
-            test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
+            fname = 'out/pretrain_{}.txt'.format(epoch)
+            generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
+            likelihood_data_loader.create_batches(fname)
+            test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
             print('pre-train epoch ', epoch, 'test_loss ', test_loss)
             buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
             log.write(buffer)
@@ -149,9 +206,10 @@ def main():
 
         # Test
         if total_batch % 5 == 0 or total_batch == TOTAL_BATCH - 1:
-            generate_samples(sess, generator, BATCH_SIZE, generated_num, eval_file)
-            likelihood_data_loader.create_batches(eval_file)
-            test_loss = target_loss(sess, target_lstm, likelihood_data_loader)
+            fname = 'out/adtrain_{}.txt'.format(total_batch)
+            generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
+            likelihood_data_loader.create_batches(fname)
+            test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
             buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
             print('total_batch: ', total_batch, 'test_loss: ', test_loss)
             log.write(buffer)
@@ -176,7 +234,6 @@ def main():
                     _ = sess.run(discriminator.train_op, feed)
 
     log.close()
-
 
 if __name__ == '__main__':
     main()
