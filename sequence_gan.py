@@ -165,8 +165,10 @@ def main():
     #  pre-train generator
     print('Start pre-training...')
     log.write('pre-training...\n')
-    for epoch in tqdm(range(PRE_EPOCH_NUM)):
+    t = tqdm(range(PRE_EPOCH_NUM))
+    for epoch in t:
         loss = pre_train_epoch(sess, generator, gen_data_loader)
+        t.set_postfix(loss=loss)
         if epoch % 5 == 0:
             fname = 'out/pretrain_{}.txt'.format(epoch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
