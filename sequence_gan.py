@@ -115,7 +115,7 @@ def create_real_file(output_file):
 
     # Slice long sentences into subsequences of SEQ_LEN
     for sent in sentences:
-        for i in range(0, len(sent) - SEQ_LENGTH + 1, 3):
+        for i in range(0, len(sent) - SEQ_LENGTH + 1, SEQ_LENGTH // 2):
             sequences.append(sent[i: i + SEQ_LENGTH])
 
     print('Number of sequences:', len(sequences))
@@ -141,7 +141,7 @@ def main():
     assert START_TOKEN == 0
 
     gen_data_loader = Gen_Data_loader(BATCH_SIZE)
-    likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
+    # likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
     dis_data_loader = Dis_dataloader(BATCH_SIZE)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
@@ -170,7 +170,7 @@ def main():
         if epoch % 5 == 0:
             fname = 'out/pretrain_{}.txt'.format(epoch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
-            likelihood_data_loader.create_batches(fname)
+            # likelihood_data_loader.create_batches(fname)
             # test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
             # print('pre-train epoch ', epoch, 'test_loss ', test_loss)
             # buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
@@ -209,7 +209,7 @@ def main():
         if total_batch % 5 == 0 or total_batch == TOTAL_BATCH - 1:
             fname = 'out/adtrain_{}.txt'.format(total_batch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
-            likelihood_data_loader.create_batches(fname)
+            # likelihood_data_loader.create_batches(fname)
             # test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
             # buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
             # print('total_batch: ', total_batch, 'test_loss: ', test_loss)
