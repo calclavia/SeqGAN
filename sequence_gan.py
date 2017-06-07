@@ -12,17 +12,18 @@ from nltk.tokenize import sent_tokenize
 from keras.preprocessing.text import Tokenizer
 import os
 import json
+from tqdm import tqdm
 
 vocab_size = 5000
 
 #########################################################################################
 #  Generator  Hyper-parameters
 ######################################################################################
-EMB_DIM = 32 # embedding dimension
-HIDDEN_DIM = 32 # hidden state dimension of lstm cell
+EMB_DIM = 128 # embedding dimension
+HIDDEN_DIM = 128 # hidden state dimension of lstm cell
 SEQ_LENGTH = 20 # sequence length
 START_TOKEN = 0
-PRE_EPOCH_NUM = 120 # supervise (maximum likelihood estimation) epochs
+PRE_EPOCH_NUM = 100 # supervise (maximum likelihood estimation) epochs
 SEED = 88
 BATCH_SIZE = 64
 
@@ -40,8 +41,8 @@ dis_batch_size = 64
 #  Basic Training Parameters
 #########################################################################################
 TOTAL_BATCH = 800
-positive_file = 'save/real_data.txt'
-negative_file = 'save/generator_sample.txt'
+positive_file = 'out/real_data.txt'
+negative_file = 'out/generator_sample.txt'
 generated_num = 10000
 
 
@@ -164,20 +165,20 @@ def main():
     #  pre-train generator
     print('Start pre-training...')
     log.write('pre-training...\n')
-    for epoch in range(PRE_EPOCH_NUM):
+    for epoch in tqdm(range(PRE_EPOCH_NUM)):
         loss = pre_train_epoch(sess, generator, gen_data_loader)
         if epoch % 5 == 0:
             fname = 'out/pretrain_{}.txt'.format(epoch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
             likelihood_data_loader.create_batches(fname)
-            test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
-            print('pre-train epoch ', epoch, 'test_loss ', test_loss)
-            buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
-            log.write(buffer)
+            # test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
+            # print('pre-train epoch ', epoch, 'test_loss ', test_loss)
+            # buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
+            # log.write(buffer)
 
     print('Start pre-training discriminator...')
     # Train 3 epoch on the generated data and do this for 50 times
-    for _ in range(50):
+    for _ in tqdm(range(50)):
         generate_samples(sess, generator, BATCH_SIZE, generated_num, negative_file)
         dis_data_loader.load_train_data(positive_file, negative_file)
         for _ in range(3):
@@ -196,7 +197,7 @@ def main():
     print('#########################################################################')
     print('Start Adversarial Training...')
     log.write('adversarial training...\n')
-    for total_batch in range(TOTAL_BATCH):
+    for total_batch in tqdm(range(TOTAL_BATCH)):
         # Train the generator for one step
         for it in range(1):
             samples = generator.generate(sess)
@@ -209,10 +210,10 @@ def main():
             fname = 'out/adtrain_{}.txt'.format(total_batch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
             likelihood_data_loader.create_batches(fname)
-            test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
-            buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
-            print('total_batch: ', total_batch, 'test_loss: ', test_loss)
-            log.write(buffer)
+            # test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
+            # buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
+            # print('total_batch: ', total_batch, 'test_loss: ', test_loss)
+            # log.write(buffer)
 
         # Update roll-out parameters
         rollout.update_params()
