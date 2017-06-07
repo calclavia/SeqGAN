@@ -74,7 +74,7 @@ def load_data():
     print('Found {} unique tokens.'.format(len(charset)))
 
     # Create training data and target data.
-    # First, map to numbers 
+    # First, map to numbers
     train_data = [[invdict[c] for c in seq] for seq in [x[:-1] for x in sequences]]
     target_data = [[invdict[c] for c in seq] for seq in [x[1:] for x in sequences]]
 
@@ -88,7 +88,7 @@ def load_data():
 
     # Save char map info
     info = (num_chars,invdict)
-    np.save('char_maps',info)
+    np.save('out/char_maps',info)
     return train_data, target_data, invdict, num_chars
 
 
@@ -168,7 +168,7 @@ def train(args):
 
     for e in t:
         ## Train generator
-        for g in range(0,G):
+        for g in range(0, G):
             # Perform rollouts
             full_outputs = generate_seq(generator, num_chars, SEQ_LEN+1, ROLLOUT_BATCH)
             outputs = full_outputs[:,1:]
@@ -184,7 +184,7 @@ def train(args):
             # advantages = rewards * 2 - 1
             # Normalize rewards
             std_rewards = np.std(rewards)
-            advantages = (rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
+            advantages = rewards#(rewards - avg_rewards) / (std_rewards if std_rewards != 0 else 1)
 
             # Convert outputs into one-hot version to use as target labels
             #chosen = np.array([to_categorical(o, num_chars) for o in outputs])
@@ -201,7 +201,8 @@ def train(args):
         d_train = np.concatenate([outputs, train_data[rand_ids, :]], axis=0)
 
         # Train to classify fake and real data
-        d_metric = discriminator.train_on_batch(d_train, d_targets)
+        # d_metric = discriminator.train_on_batch(d_train, d_targets)
+        d_metric = [0, 0]
 
         # Update progress bar
         running_rewards.append(avg_rewards)
@@ -236,7 +237,7 @@ def generate_seq(generator, char_n, length=GEN_LEN, batch=1):
         # Pick the last result for each batch
         distr = distr[:, -1]
         choices = np.reshape(sample(distr, char_n, temp=TEMP), [-1, 1])
-        choices = np.array([to_categorical(choice, char_n) for choice in choices]) 
+        choices = np.array([to_categorical(choice, char_n) for choice in choices])
         outputs = np.hstack([outputs, choices])
 
     # Slice out the last words (Ignore the buffer)
@@ -260,7 +261,7 @@ def generate(args):
     Main function executed to start training on dataset.
     """
     # Load data info
-    info = np.load('char_maps.npy')
+    info = np.load('out/char_maps.npy')
     num_chars = info[0]
     inv_idx = info[1]
 
@@ -321,7 +322,7 @@ def test_bleu(args):
 
     avg_score = sum(scores) / float(len(scores))
     print ("Score is:" + str(avg_score))
-    
+
 
 if __name__ == '__main__':
     main()
