@@ -5,7 +5,7 @@ from dataloader import Gen_Data_loader, Dis_dataloader
 from generator import Generator
 from discriminator import Discriminator
 from rollout import ROLLOUT
-from target_lstm import TARGET_LSTM
+from oracle import Oracle
 import pickle
 
 from nltk.tokenize import sent_tokenize
@@ -58,15 +58,15 @@ def generate_samples(sess, trainable_model, batch_size, generated_num, output_fi
             fout.write(buffer)
 
 
-def target_loss(sess, target_lstm, data_loader):
-    # target_loss means the oracle negative log-likelihood tested with the oracle model "target_lstm"
+def oracle_loss(sess, oracle, data_loader):
+    # oracle_loss means the oracle negative log-likelihood tested with the oracle model "oracle"
     # For more details, please see the Section 4 in https://arxiv.org/abs/1609.05473
     nll = []
     data_loader.reset_pointer()
 
     for it in range(data_loader.num_batch):
         batch = data_loader.next_batch()
-        g_loss = sess.run(target_lstm.pretrain_loss, {target_lstm.x: batch})
+        g_loss = sess.run(oracle.pretrain_loss, {oracle.x: batch})
         nll.append(g_loss)
 
     return np.mean(nll)
@@ -76,7 +76,7 @@ def pre_train_epoch(sess, trainable_model, data_loader):
     supervised_g_losses = []
     data_loader.reset_pointer()
 
-    for it in range(data_loader.num_batch):
+    for it in tqdm(range(data_loader.num_batch)):
         batch = data_loader.next_batch()
         _, g_loss = trainable_model.pretrain_step(sess, batch)
         supervised_g_losses.append(g_loss)
@@ -141,12 +141,13 @@ def main():
     assert START_TOKEN == 0
 
     gen_data_loader = Gen_Data_loader(BATCH_SIZE)
-    # likelihood_data_loader = Gen_Data_loader(BATCH_SIZE) # For testing
+    # For testing
+    oracle_data_loader = Gen_Data_loader(BATCH_SIZE)
     dis_data_loader = Dis_dataloader(BATCH_SIZE)
 
     generator = Generator(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
-    # target_params = pickle.load(open('save/target_params.pkl', 'rb'))
-    # target_lstm = TARGET_LSTM(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN, target_params) # The oracle model
+    # The oracle model
+    oracle = Oracle(vocab_size, BATCH_SIZE, EMB_DIM, HIDDEN_DIM, SEQ_LENGTH, START_TOKEN)
 
     discriminator = Discriminator(sequence_length=20, num_classes=2, vocab_size=vocab_size, embedding_size=dis_embedding_dim,
                                 filter_sizes=dis_filter_sizes, num_filters=dis_num_filters, l2_reg_lambda=dis_l2_reg_lambda)
@@ -157,14 +158,13 @@ def main():
     sess.run(tf.global_variables_initializer())
 
     # First, use the oracle model to provide the positive examples, which are sampled from the oracle data distribution
-    # generate_samples(sess, target_lstm, BATCH_SIZE, generated_num, positive_file)
+    generate_samples(sess, oracle, BATCH_SIZE, generated_num, positive_file)
     create_real_file(positive_file)
     gen_data_loader.create_batches(positive_file)
 
-    log = open('save/experiment-log.txt', 'w')
     #  pre-train generator
     print('Start pre-training...')
-    log.write('pre-training...\n')
+
     t = tqdm(range(PRE_EPOCH_NUM))
     for epoch in t:
         loss = pre_train_epoch(sess, generator, gen_data_loader)
@@ -172,11 +172,10 @@ def main():
         if epoch % 5 == 0:
             fname = 'out/pretrain_{}.txt'.format(epoch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
-            # likelihood_data_loader.create_batches(fname)
-            # test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
-            # print('pre-train epoch ', epoch, 'test_loss ', test_loss)
-            # buffer = 'epoch:\t'+ str(epoch) + '\tnll:\t' + str(test_loss) + '\n'
-            # log.write(buffer)
+
+            oracle_data_loader.create_batches(fname)
+            test_loss = oracle_loss(sess, oracle, oracle_data_loader)
+            print('pre-train epoch ', epoch, 'test_loss ', test_loss)
 
     print('Start pre-training discriminator...')
     # Train 3 epoch on the generated data and do this for 50 times
@@ -198,7 +197,6 @@ def main():
 
     print('#########################################################################')
     print('Start Adversarial Training...')
-    log.write('adversarial training...\n')
     for total_batch in tqdm(range(TOTAL_BATCH)):
         # Train the generator for one step
         for it in range(1):
@@ -211,11 +209,9 @@ def main():
         if total_batch % 5 == 0 or total_batch == TOTAL_BATCH - 1:
             fname = 'out/adtrain_{}.txt'.format(total_batch)
             generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
-            # likelihood_data_loader.create_batches(fname)
-            # test_loss = 0#target_loss(sess, target_lstm, likelihood_data_loader)
-            # buffer = 'epoch:\t' + str(total_batch) + '\tnll:\t' + str(test_loss) + '\n'
-            # print('total_batch: ', total_batch, 'test_loss: ', test_loss)
-            # log.write(buffer)
+            oracle_data_loader.create_batches(fname)
+            test_loss = oracle_loss(sess, oracle, oracle_data_loader)
+            print('total_batch: ', total_batch, 'test_loss: ', test_loss)
 
         # Update roll-out parameters
         rollout.update_params()
@@ -235,8 +231,6 @@ def main():
                         discriminator.dropout_keep_prob: dis_dropout_keep_prob
                     }
                     _ = sess.run(discriminator.train_op, feed)
-
-    log.close()
 
 if __name__ == '__main__':
     main()
