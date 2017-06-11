@@ -102,7 +102,13 @@ class Generator(nn.Module):
 
     def reinforce(self, outputs, rewards):
         optimizer = optim.Adam(self.parameters())
-        advantages = rewards
+
+        # Compute advantages
+        rewards = rewards.data.cpu().numpy()
+        rewards -= np.mean(rewards)
+        rewards /= np.std(rewards)
+        advantages = Variable(torch.Tensor(rewards)).cuda()
+
         loss = -torch.sum(torch.mm(outputs, advantages))
         loss.backward()
         optimizer.step()
@@ -153,4 +159,4 @@ class Discriminator(nn.Module):
         loss.backward()
         optimizer.step()
 
-        return output, loss.data[0] / input_seqs.size()[0], accuracy.data[0]
+        return loss.data[0] / input_seqs.size()[0], accuracy.data[0]
