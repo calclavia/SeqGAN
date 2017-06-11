@@ -4,12 +4,26 @@ import torch.optim as optim
 
 from constants import *
 
-class Generator(nn.Module):
+class CommonModule(nn.Module):
     def __init__(self, num_chars, hidden_size):
         super().__init__()
         self.num_chars = num_chars
         self.hidden_size = hidden_size
-        self.lstm = nn.LSTM(num_chars, hidden_size, num_layers=3, dropout=0.5)
+        self.lstm = nn.LSTM(num_chars, hidden_size, num_layers=1, dropout=0.5)
+        self.dropout = nn.Dropout(0.5)
+
+    def forward(self, inputs, hidden):
+        out, hidden = self.lstm(inputs, hidden)
+        out = self.dropout(out)
+        return out, hidden
+
+class Generator(nn.Module):
+    def __init__(self, num_chars, hidden_size, common):
+        super().__init__()
+        self.num_chars = num_chars
+        self.hidden_size = hidden_size
+        self.common = common
+        self.lstm = nn.LSTM(hidden_size, hidden_size, num_layers=2, dropout=0.5)
         self.prediction = nn.Linear(hidden_size, num_chars)
         self.log_softmax = nn.LogSoftmax()
         self.dropout = nn.Dropout(0.5)
@@ -17,13 +31,15 @@ class Generator(nn.Module):
     def forward(self, inputs, hidden):
         seq_len = inputs.size()[0]
 
-        out, hidden = self.lstm(inputs, hidden)
+        out, hidden1 = self.common(inputs, hidden[0] if hidden else None)
+        out, hidden2 = self.lstm(out, hidden[1] if hidden else None)
+
         out = out.view(-1, self.hidden_size)
         out = self.dropout(out)
         out = self.prediction(out)
         out = self.log_softmax(out)
         out = out.view(seq_len, -1, self.num_chars)
-        return out, hidden
+        return out, (hidden1, hidden2)
 
     def train_step(self, input_seqs, target_seqs):
         """
@@ -47,26 +63,26 @@ class Generator(nn.Module):
         return loss.data[0] / input_seqs.size()[0]
 
 class Discriminator(nn.Module):
-    def __init__(self, num_chars, hidden_size):
+    def __init__(self, num_chars, hidden_size, common):
         super().__init__()
         self.num_chars = num_chars
         self.hidden_size = hidden_size
-        self.lstm = nn.LSTM(num_chars, hidden_size, num_layers=2, dropout=0.5)
+        self.common = common
+        self.lstm = nn.LSTM(hidden_size, hidden_size, num_layers=1, dropout=0.5)
         self.prediction = nn.Linear(hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.dropout = nn.Dropout(0.5)
 
     def forward(self, inputs, hidden):
-        seq_len = inputs.size()[0]
-
-        out, hidden = self.lstm(inputs, hidden)
+        out, hidden1 = self.common(inputs, hidden[0] if hidden else None)
+        out, hidden2 = self.lstm(out, hidden[1] if hidden else None)
 
         # We only care about the last output
         out = out[-1, :, :]
         out = self.dropout(out)
         out = self.prediction(out)
         out = self.sigmoid(out)
-        return out, hidden
+        return out, (hidden1, hidden2)
 
     def train_step(self, input_seqs, target_seqs):
         """
