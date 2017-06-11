@@ -1,8 +1,8 @@
 import string
 
 # Model Parameters
-all_chars = string.ascii_letters + " .,;!?$#'\"-\n"
-n_chars = len(all_chars)
+ALL_CHARS = string.ascii_letters + " .,;!?$#'\"-\n"
+N_CHARS = len(ALL_CHARS)
 
 G_UNITS = 512
 D_UNITS = 512
@@ -10,9 +10,9 @@ D_UNITS = 512
 # Training Parameters
 SEQ_LEN = 128
 BATCH_SIZE = 32
-max_iterations = 100000
-gan_iteration = 10000
-D_STEPS = 0
+MAX_ITERATIONS = 100000
+GAN_ITERATIONS = 10000
+D_STEPS = 5
 
 # Generation Parameters
 TEMP = 1

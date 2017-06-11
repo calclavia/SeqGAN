@@ -1,4 +1,2 @@
-tensorflow-gpu
-keras
-nltk
+pytorch
 tqdm

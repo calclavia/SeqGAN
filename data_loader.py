@@ -14,7 +14,7 @@ def unicodeToAscii(s):
     return ''.join(
         c for c in unicodedata.normalize('NFD', s)
         if unicodedata.category(c) != 'Mn'
-        and c in all_chars
+        and c in ALL_CHARS
     )
 
 def random_subseq(seq, seq_len=SEQ_LEN):
@@ -25,17 +25,17 @@ def input_tensors(lines):
     """
     Converts a string to a one-hot tensor
     """
-    tensor = torch.zeros(len(lines[0]), len(lines), n_chars)
+    tensor = torch.zeros(len(lines[0]), len(lines), N_CHARS)
     for i in range(tensor.size()[1]):
         for t in range(tensor.size()[0]):
-            tensor[t][i][all_chars.find(lines[i][t])] = 1
+            tensor[t][i][ALL_CHARS.find(lines[i][t])] = 1
     return tensor
 
 def target_tensors(lines):
     """
     Converts a string to a character ID tensor
     """
-    letter_indexes = [[all_chars.find(c) for c in line] for line in lines]
+    letter_indexes = [[ALL_CHARS.find(c) for c in line] for line in lines]
     # Change tensor back into [seq, batch]
     return torch.LongTensor(letter_indexes).permute(1, 0)
 

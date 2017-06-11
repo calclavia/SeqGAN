@@ -1,7 +1,7 @@
 import torch
 
 from util import *
-from p_model import *
+from model import *
 from constants import *
 from data_loader import *
 
@@ -9,8 +9,8 @@ def main():
     torch.backends.cudnn.enabled = False
 
     print('Building models...')
-    common = CommonModule(n_chars, G_UNITS)
-    generator = Generator(n_chars, G_UNITS, common).cuda()
+    common = CommonModule(N_CHARS, G_UNITS)
+    generator = Generator(N_CHARS, G_UNITS, common).cuda()
 
     try:
         generator.load_state_dict(torch.load(G_MODEL_PATH))
