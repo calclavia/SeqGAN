@@ -168,14 +168,13 @@ def main():
     t = tqdm(range(PRE_EPOCH_NUM))
     for epoch in t:
         loss = pre_train_epoch(sess, generator, gen_data_loader)
-        t.set_postfix(loss=loss)
-        if epoch % 5 == 0:
-            fname = 'out/pretrain_{}.txt'.format(epoch)
-            generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
 
-            oracle_data_loader.create_batches(fname)
-            test_loss = oracle_loss(sess, oracle, oracle_data_loader)
-            print('pre-train epoch ', epoch, 'test_loss ', test_loss)
+        fname = 'out/pretrain_{}.txt'.format(epoch)
+        generate_samples(sess, generator, BATCH_SIZE, generated_num, fname)
+
+        oracle_data_loader.create_batches(fname)
+        test_loss = oracle_loss(sess, oracle, oracle_data_loader)
+        t.set_postfix(loss=loss, oracle_loss=test_loss)
 
     print('Start pre-training discriminator...')
     # Train 3 epoch on the generated data and do this for 50 times
