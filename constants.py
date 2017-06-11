@@ -1,30 +1,26 @@
 import string
 
 # Model Parameters
-MAX_VOCAB = 1024
-EMBEDDING_DIM = 100
-NUM_UNITS = 64
+all_chars = string.ascii_letters + " .,;!?$#'\"-\n"
+n_chars = len(all_chars)
+
+G_UNITS = 512
+D_UNITS = 512
 
 # Training Parameters
 SEQ_LEN = 128
 BATCH_SIZE = 32
+max_iterations = 100000
+gan_iteration = 10000
 
 # Generation Parameters
 TEMP = 1
-GEN_LEN = 64
 BLEU_SAMPLES = 10
 NGRAM = 4
 
 # Paths
-G_MODEL_PATH = 'out/generator.h5'
-D_MODEL_PATH = 'out/discriminator.h5'
+G_MODEL_PATH = 'out/generator.torch'
+D_MODEL_PATH = 'out/discriminator.torch'
 
 RL_G_MODEL_PATH = 'out/generator_rl.h5'
 RL_D_MODEL_PATH = 'out/discriminator_rl.h5'
-
-## TODO: New stuff
-all_chars = string.ascii_letters + " .,;!?$#'\"-\n"
-n_chars = len(all_chars)
-
-g_units = 512
-d_units = 512
