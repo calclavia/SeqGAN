@@ -32,7 +32,7 @@ def main():
     for i in t:
         if np.random.random() < i / gan_iteration:
             # Train generator (REINFORCE)
-            fake_text, outputs = generator.sample(batch=batch_size, length=SEQ_LEN, eval_mode=False)
+            fake_text, outputs = generator.sample(batch=BATCH_SIZE, length=SEQ_LEN, eval_mode=False)
             input_seqs = Variable(input_tensors(fake_text)).cuda()
             rewards, _ = discriminator(input_seqs, None)
             generator.reinforce(outputs, rewards)
@@ -43,7 +43,7 @@ def main():
             run_g_loss = g_loss if run_g_loss is None else run_g_loss * 0.99 + g_loss * 0.01
 
         # Train discriminator
-        fake_text, outputs = generator.sample(batch=batch_size // 2, length=SEQ_LEN)
+        fake_text, outputs = generator.sample(batch=BATCH_SIZE // 2, length=SEQ_LEN)
         input_seqs, target_seqs = make_d_batch(fake_text, text)
         d_loss, d_acc = discriminator.train_step(input_seqs, target_seqs)
 

@@ -25,6 +25,6 @@ RL_D_MODEL_PATH = 'out/discriminator_rl.h5'
 ## TODO: New stuff
 all_chars = string.ascii_letters + " .,;!?$#'\"-\n"
 n_chars = len(all_chars)
-batch_size = 32
-g_units = 256
-d_units = 256
+
+g_units = 512
+d_units = 512

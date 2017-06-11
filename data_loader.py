@@ -47,7 +47,7 @@ def make_g_batch(text):
     input_seqs = []
     target_seqs = []
 
-    for b in range(batch_size):
+    for b in range(BATCH_SIZE):
         seq = random_subseq(text, SEQ_LEN + 1)
         input_seqs.append(seq[:-1])
         target_seqs.append(seq[1:])
@@ -60,7 +60,7 @@ def make_d_batch(fake_text, real_text):
     """
     Samples from a text and generates a batch of inputs
     """
-    num = batch_size // 2
+    num = BATCH_SIZE // 2
 
     # Create fake batch
     input_seqs = fake_text
