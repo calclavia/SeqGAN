@@ -24,24 +24,14 @@ def random_subseq(seq, seq_len=SEQ_LEN):
     index = random.randint(0, len(seq) - seq_len - 1)
     return seq[index:index + seq_len]
 
-def input_tensor(line):
-    """
-    Converts a string to a one-hot tensor
-    """
-    tensor = torch.zeros(len(line), 1, n_chars)
-    for i in range(len(line)):
-        letter = line[i]
-        tensor[i][0][all_chars.find(letter)] = 1
-    return tensor
-
 def input_tensors(lines):
     """
     Converts a string to a one-hot tensor
     """
     tensor = torch.zeros(len(lines[0]), len(lines), n_chars)
-    for i in range(len(lines)):
-        for j in range(len(lines[i])):
-            tensor[j][i][all_chars.find(lines[i][j])] = 1
+    for i in range(tensor.size()[1]):
+        for t in range(tensor.size()[0]):
+            tensor[t][i][all_chars.find(lines[i][t])] = 1
     return tensor
 
 def target_tensors(lines):
@@ -49,7 +39,8 @@ def target_tensors(lines):
     Converts a string to a character ID tensor
     """
     letter_indexes = [[all_chars.find(c) for c in line] for line in lines]
-    return torch.LongTensor(letter_indexes)
+    # Change tensor back into [seq, batch]
+    return torch.LongTensor(letter_indexes).permute(1, 0)
 
 def make_g_batch(text):
     """
@@ -68,6 +59,16 @@ def make_g_batch(text):
     target_seqs = Variable(target_tensors(target_seqs)).cuda()
     return input_seqs, target_seqs
 
+def input_tensor(line):
+    """
+    Converts a string to a one-hot tensor
+    """
+    tensor = torch.zeros(len(line), 1, n_chars)
+    for i in range(len(line)):
+        letter = line[i]
+        tensor[i][0][all_chars.find(letter)] = 1
+    return tensor
+
 def make_d_batch(fake_text, real_text):
     """
     Samples from a text and generates a batch of inputs
@@ -84,14 +85,17 @@ def make_d_batch(fake_text, real_text):
     target_seqs = Variable(torch.Tensor([0] * num + [1] * num)).cuda()
     return input_seqs, target_seqs
 
-def sample(model, batch=1, length=512):
+def sample(model, batch=1, length=512, eval_mode=True):
     """
     Samples from the model and generates text.
     """
-    model.eval()
+    if eval_mode:
+        model.eval()
+    else:
+        model.train()
     hidden = None
     output_str = [all_chars[random.randint(0, n_chars - 1)] for i in range(batch)]
-    current_char = Variable(input_tensors(output_str), volatile=True).cuda()
+    current_char = Variable(input_tensors(output_str), volatile=eval_mode).cuda()
 
     for i in range(length):
         output, hidden = model(current_char, hidden)
@@ -111,9 +115,9 @@ def main():
     text = unicodeToAscii(text)
 
     print('Building models...')
-    common = CommonModule(n_chars, g_units).cuda()
+    common = CommonModule(n_chars, g_units)
     generator = Generator(n_chars, g_units, common).cuda()
-    discriminator = Discriminator(n_chars, g_units, common).cuda()
+    discriminator = Discriminator(n_chars, d_units, common).cuda()
 
     print('Training...')
     run_g_loss = None
@@ -123,15 +127,15 @@ def main():
     t = tqdm(range(100000))
 
     for i in t:
-        # Train generator
+        # Train generator (MLE)
         input_seqs, target_seqs = make_g_batch(text)
         g_loss = generator.train_step(input_seqs, target_seqs)
         run_g_loss = g_loss if run_g_loss is None else run_g_loss * 0.99 + g_loss * 0.01
 
-        if i % 4 == 0:
+        if False:
             # Train discriminator
             fake_text = sample(generator, batch=16, length=SEQ_LEN)
-            input_seqs, target_seqs = make_d_batch(fake_text, text)
+            pred, input_seqs, target_seqs = make_d_batch(fake_text, text)
             d_loss, d_acc = discriminator.train_step(input_seqs, target_seqs)
 
             run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01

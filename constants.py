@@ -7,7 +7,7 @@ NUM_UNITS = 64
 
 # Training Parameters
 G = 2
-SEQ_LEN = 64
+SEQ_LEN = 128
 TRAIN_WINDOW = 1
 FAKE_GEN_BATCH_SIZE = 2048
 NUM_FAKE = FAKE_GEN_BATCH_SIZE * 10
@@ -32,5 +32,5 @@ RL_D_MODEL_PATH = 'out/discriminator_rl.h5'
 all_chars = string.ascii_letters + " .,;!?$#'\"-\n"
 n_chars = len(all_chars)
 batch_size = 32
-g_units = 400
-d_units = 200
+g_units = 300
+d_units = 300

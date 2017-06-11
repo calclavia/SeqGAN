@@ -107,4 +107,4 @@ class Discriminator(nn.Module):
         loss.backward()
         optimizer.step()
 
-        return loss.data[0] / input_seqs.size()[0], accuracy.data[0]
+        return output, loss.data[0] / input_seqs.size()[0], accuracy.data[0]
