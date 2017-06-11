@@ -38,7 +38,9 @@ def main():
     t = tqdm(range(max_iterations))
 
     for i in t:
-        if np.random.random() < i / gan_iteration:
+        gan_prob = min(i / gan_iteration, 1)
+
+        if np.random.random() < gan_prob:
             # Train generator (REINFORCE)
             fake_text, outputs = generator.sample(batch=BATCH_SIZE, length=SEQ_LEN, eval_mode=False)
             input_seqs = Variable(input_tensors(fake_text)).cuda()
@@ -61,7 +63,7 @@ def main():
             run_d_acc = d_acc if run_d_acc is None else run_d_acc * 0.99 + d_acc * 0.01
 
         # Track loss
-        t.set_postfix(g_loss=run_g_loss, d_loss=run_d_loss, d_acc=run_d_acc)
+        t.set_postfix(gan_prob=gan_prob, g_loss=run_g_loss, d_loss=run_d_loss, d_acc=run_d_acc)
 
         if i % 1000 == 0:
             print('=== Generating Sample ===')
