@@ -20,18 +20,9 @@ def unicodeToAscii(s):
         and c in all_chars
     )
 
-def random_subseq(seq, seq_len=128):
+def random_subseq(seq, seq_len=SEQ_LEN):
     index = random.randint(0, len(seq) - seq_len - 1)
     return seq[index:index + seq_len]
-
-def train_seq(text, seq_len=128):
-    """
-    Extracts a random training pair from the corpus
-    """
-    index = random.randint(0, len(text) - seq_len - 2)
-    input_seq = Variable(input_tensor(text[index:index + seq_len])).cuda()
-    target_seq = Variable(target_tensor(text[index + 1:index + seq_len + 1])).cuda()
-    return input_seq, target_seq
 
 def input_tensor(line):
     """
@@ -53,26 +44,28 @@ def input_tensors(lines):
             tensor[j][i][all_chars.find(lines[i][j])] = 1
     return tensor
 
-def target_tensor(line):
+def target_tensors(lines):
     """
     Converts a string to a character ID tensor
     """
-    letter_indexes = [all_chars.find(c) for c in line]
+    letter_indexes = [[all_chars.find(c) for c in line] for line in lines]
     return torch.LongTensor(letter_indexes)
 
 def make_g_batch(text):
     """
     Samples from a text and generates a batch of inputs
     """
+    # Create data batch
     input_seqs = []
     target_seqs = []
-    # Create data batch
+
     for b in range(batch_size):
-        input_seq, target_seq = train_seq(text)
-        input_seqs.append(input_seq)
-        target_seqs.append(target_seq)
-    input_seqs = torch.cat(input_seqs, dim=1)
-    target_seqs = torch.stack(target_seqs, dim=1)
+        seq = random_subseq(text, SEQ_LEN + 1)
+        input_seqs.append(seq[:-1])
+        target_seqs.append(seq[1:])
+
+    input_seqs = Variable(input_tensors(input_seqs)).cuda()
+    target_seqs = Variable(target_tensors(target_seqs)).cuda()
     return input_seqs, target_seqs
 
 def make_d_batch(fake_text, real_text):
@@ -102,7 +95,7 @@ def sample(model, batch=1, length=512):
 
     for i in range(length):
         output, hidden = model(current_char, hidden)
-        dists = np.exp(output.data[0].cpu().numpy())
+        dists = torch.exp(output).data[0].cpu().numpy()
         choices = [np.random.choice(n_chars, 1, p=dist)[0] for dist in dists]
         letters = [all_chars[choice] for choice in choices]
         current_char = Variable(input_tensors(letters)).cuda()
@@ -135,14 +128,15 @@ def main():
         g_loss = generator.train_step(input_seqs, target_seqs)
         run_g_loss = g_loss if run_g_loss is None else run_g_loss * 0.99 + g_loss * 0.01
 
-        # Train discriminator
-        fake_text = sample(generator, batch=16, length=128)
-        input_seqs, target_seqs = make_d_batch(fake_text, text)
-        d_loss, d_acc = discriminator.train_step(input_seqs, target_seqs)
+        if i % 4 == 0:
+            # Train discriminator
+            fake_text = sample(generator, batch=16, length=SEQ_LEN)
+            input_seqs, target_seqs = make_d_batch(fake_text, text)
+            d_loss, d_acc = discriminator.train_step(input_seqs, target_seqs)
 
-        run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01
-        run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01
-        run_d_acc = d_acc if run_d_acc is None else run_d_acc * 0.99 + d_acc * 0.01
+            run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01
+            run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01
+            run_d_acc = d_acc if run_d_acc is None else run_d_acc * 0.99 + d_acc * 0.01
 
         # Track loss
         t.set_postfix(g_loss=run_g_loss, d_loss=run_d_loss, d_acc=run_d_acc)
