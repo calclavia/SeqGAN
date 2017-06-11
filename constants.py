@@ -7,7 +7,7 @@ NUM_UNITS = 64
 
 # Training Parameters
 SEQ_LEN = 128
-BATCH_SIZE = 256
+BATCH_SIZE = 32
 
 # Generation Parameters
 TEMP = 1

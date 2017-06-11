@@ -106,7 +106,6 @@ class Generator(nn.Module):
         loss = -torch.sum(torch.mm(outputs, advantages))
         loss.backward()
         optimizer.step()
-        print(outputs, advantages, loss)
         return loss
 
 class Discriminator(nn.Module):
