@@ -12,6 +12,7 @@ SEQ_LEN = 128
 BATCH_SIZE = 32
 max_iterations = 100000
 gan_iteration = 10000
+D_STEPS = 0
 
 # Generation Parameters
 TEMP = 1
@@ -21,6 +22,3 @@ NGRAM = 4
 # Paths
 G_MODEL_PATH = 'out/generator.torch'
 D_MODEL_PATH = 'out/discriminator.torch'
-
-RL_G_MODEL_PATH = 'out/generator_rl.h5'
-RL_D_MODEL_PATH = 'out/discriminator_rl.h5'
