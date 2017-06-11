@@ -113,6 +113,7 @@ def main():
     print('Training...')
     run_g_loss = None
     run_d_loss = None
+    run_d_acc = None
 
     t = tqdm(range(10000))
 
@@ -124,12 +125,14 @@ def main():
         # Train discriminator
         fake_text = sample(generator)
         input_seqs, target_seqs = make_d_batch(fake_text, text)
-        d_loss = discriminator.train_step(input_seqs, target_seqs)
+        d_loss, d_acc = discriminator.train_step(input_seqs, target_seqs)
 
         # Track loss
-        run_g_loss = g_loss if run_g_loss is None else run_g_loss * 0.999 + g_loss * 0.001
-        run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.999 + d_loss * 0.001
-        t.set_postfix(g_loss=run_g_loss, d_loss=run_d_loss)
+        run_g_loss = g_loss if run_g_loss is None else run_g_loss * 0.99 + g_loss * 0.01
+        run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01
+        run_d_loss = d_loss if run_d_loss is None else run_d_loss * 0.99 + d_loss * 0.01
+        run_d_acc = d_acc if run_d_acc is None else run_d_acc * 0.99 + d_acc * 0.01
+        t.set_postfix(g_loss=run_g_loss, d_loss=run_d_loss, d_acc=run_d_acc)
 
         if i % 1000 == 0:
             print('=== Generating Sample ===')

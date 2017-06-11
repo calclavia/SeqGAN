@@ -84,7 +84,11 @@ class Discriminator(nn.Module):
         output, hidden = self.forward(input_seqs, hidden)
         loss = criterion(output, target_seqs)
 
+        # Compute accuracy
+        b_outputs = torch.round(output)
+        accuracy = torch.mean(target_seqs * b_outputs + (1 - target_seqs) * (1 - b_outputs))
+
         loss.backward()
         optimizer.step()
 
-        return loss.data[0] / input_seqs.size()[0]
+        return loss.data[0] / input_seqs.size()[0], accuracy.data[0]
