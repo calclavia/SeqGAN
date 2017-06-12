@@ -1,4 +1,6 @@
-An implementation of SeqGAN in Pytorch.
+# Multitasking SeqGAN
+An implementation of SeqGAN in Pytorch. Uses generative adversarial methods to
+train a language model to predict the next character.
 
 ## Requirements
 - Python 3.6
